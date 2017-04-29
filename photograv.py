@@ -127,6 +127,21 @@ def get_magnetic_force(charge,px,py,pz,vx,vy,vz,mx,my,mz,starx,stary):
     
     return Fmagx,Fmagy,Fmagz
 
+
+def integrate(Fx,Fy,Fz,vx,vy,vz,px,py,pz,ship_mass, timestep):
+    '''Integrates the system given a total force F'''
+    
+    vxnew = vx + Fx/ship_mass * timestep
+    vynew = vy + Fy/ship_mass * timestep
+    vznew = vz + Fz/ship_mass * timestep
+    
+    pxnew = px + vxnew*timestep
+    pynew = py + vynew*timestep
+    pznew = pz + vznew*timestep
+    
+    return pxnew,pynew,pznew, vxnew,vynew,vznew
+    
+
 def fly(
     px,
     py,
@@ -160,28 +175,38 @@ def fly(
     result_array[:] = numpy.NAN
     deceleration_phase = True
 
-
+    
     # Hard code a magnetic moment aligned with the z-axis
     mx = 0.0
     my = 0.0
     mz = 1.0
     charge = 1.0
 
+    pz = 0.0
+    vz = 0.0
+
     # Main loop
     for step in range(number_of_steps):
+
+        total_F_x = 0.0
+        total_F_y = 0.0
+        total_F_z = 0.0
 
         # Gravity force
         gravity_F_x, gravity_F_y = get_gravity_force(
             px, py, ship_mass, M_star)
-        vx += gravity_F_x / ship_mass * timestep
-        vy += gravity_F_y / ship_mass * timestep
-
+        
+        
+        total_F_x +=gravity_F_x
+        total_F_y +=gravity_F_y
+        
 
         # Magnetic Force is velocity dependent! Needs better integration scheme
         mag_F_x, mag_F_y, mag_F_z = get_magnetic_force(charge,px,py,0.0,vx,vy,0.0,mx,my,mz,0.0,0.0)
 
-        vx +=mag_F_x/ ship_mass * timestep
-        vy +=mag_F_y/ ship_mass * timestep
+        total_F_x +=mag_F_x
+        total_F_y +=mag_F_y
+        total_F_z +=mag_F_z
 
         # Check distance from star
         star_distance = sqrt((px / R_star) ** 2 + (py / R_star) ** 2)
@@ -218,15 +243,14 @@ def fly(
         # Set sign of photon force
         if deceleration_phase:
             if px > 0:
-                vx += +photon_F_x / ship_mass * timestep
-                vy += +photon_F_y / ship_mass * timestep
+                total_F_x += +photon_F_x
+                total_F_x += +photon_F_y
             else:
-                vx += -photon_F_x / ship_mass * timestep
-                vy += -photon_F_y / ship_mass * timestep
+                total_F_x += -photon_F_x 
+                total_F_y += -photon_F_y 
 
         # Update positions
-        px += vx * timestep
-        py += vy * timestep
+        px,py,pz,vx,vy,vz = integrate(total_F_x,total_F_y,total_F_z,vx,vy,vz,px,py,pz,ship_mass, timestep)
 
         """Calculate interesting values"""
 
