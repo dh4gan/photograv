@@ -13,6 +13,7 @@ from scipy import optimize
 G = 6.67428e-11  # the gravitational constant G
 c = 299792458  # [m/sec] speed of light
 AU = (149.6e6 * 1000)  # [m] 149.6 million km
+mu0 = 1e-7*4.0*pi # permeability of free space (SI units)
 
 # Sun
 sun_radius = 695700000  # [m]
@@ -91,6 +92,41 @@ def get_photon_force(x, y, vx, vy, R_star, L_star, ship_sail_area):
     return F_x[0], F_y[0], alpha_min
 
 
+def get_magnetic_field_dipole(px,py,pz, mx,my,mz, starx,stary,starz):
+    '''Returns a spherically symmetric dipole magnetic field
+    NB: Calculated in 3D'''
+
+    sepx = px-starx
+    sepy = py-stary
+    sepz = pz-starz
+    sep2 = sepx*sepx + sepy*sepy
+    sep3 = sep2*numpy.sqrt(sep2)
+    sep5 = sep3*sep2
+    
+    mdotr = mx*sepx + my*sepy +mz*sepz
+    
+    prefac = mu0/(4.0*numpy.pi)
+    
+    Bx = prefac*(3.0*mdotr*sepx/(sep5) - mx/sep3)
+    By = prefac*(3.0*mdotr*sepy/(sep5) - my/sep3)
+    Bz = prefac*(3.0*mdotr*sepz/sep5 - mz/sep3)
+
+    return Bx, By, Bz
+
+def get_magnetic_force(charge,px,py,pz,vx,vy,vz,mx,my,mz,starx,stary):
+    
+    Bx,By,Bz = get_magnetic_field_dipole(px,py,mx,my,starx,stary)
+    
+    vcrossBx = vy*Bz - vz*By
+    vcrossBy = vz*Bx - vx*Bz
+    vcrossBz = vx*By - vy*Bx
+    
+    Fmagx = charge*vcrossBx
+    Fmagy = charge*vcrossBy
+    Fmagz = charge*vcrossBz
+    
+    return Fmagx,Fmagy,Fmagz
+
 def fly(
     px,
     py,
@@ -124,6 +160,13 @@ def fly(
     result_array[:] = numpy.NAN
     deceleration_phase = True
 
+
+    # Hard code a magnetic moment aligned with the z-axis
+    mx = 0.0
+    my = 0.0
+    mz = 1.0
+    charge = 1.0
+
     # Main loop
     for step in range(number_of_steps):
 
@@ -132,6 +175,13 @@ def fly(
             px, py, ship_mass, M_star)
         vx += gravity_F_x / ship_mass * timestep
         vy += gravity_F_y / ship_mass * timestep
+
+
+        # Magnetic Force is velocity dependent! Needs better integration scheme
+        mag_F_x, mag_F_y, mag_F_z = get_magnetic_force(charge,px,py,0.0,vx,vy,0.0,mx,my,mz,0.0,0.0)
+
+        vx +=mag_F_x/ ship_mass * timestep
+        vy +=mag_F_y/ ship_mass * timestep
 
         # Check distance from star
         star_distance = sqrt((px / R_star) ** 2 + (py / R_star) ** 2)
