@@ -42,18 +42,17 @@ def quadratic_limb_darkening(impact, limb1, limb2):
     return 1 - limb1 * (1 - impact) - limb2 * (1 - impact) ** 2
 
 
-def get_gravity_force(px_ship, py_ship, mass_ship, mass_star):
+def get_gravity_force(px_ship, py_ship, pz_ship, mass_ship, mass_star):
     """Return the gravity force in x and y directions"""
 
-    distance = sqrt(px_ship**2 + py_ship**2)
-    force = G * mass_ship * mass_star / (distance**2)
+    distance = sqrt(px_ship**2 + py_ship**2 + pz_ship**2)
+    force = -G * mass_ship * mass_star / (distance**3)
 
-    # direction of the force
-    theta = arctan2(py_ship, px_ship)
+    fx = force*px_ship
+    fy = force*py_ship
+    fz = force*pz_ship
 
-    fx = -cos(theta) * force
-    fy = -sin(theta) * force
-    return fx, fy
+    return fx, fy,fz
 
 
 def get_photon_force(x, y, vx, vy, R_star, L_star, ship_sail_area):
@@ -74,6 +73,7 @@ def get_photon_force(x, y, vx, vy, R_star, L_star, ship_sail_area):
         F_alpha_r = get_F_alpha_r(alpha)
         F_x = F_alpha_r * cos(alpha + phi)
         F_y = F_alpha_r * sin(alpha + phi)
+        
         nu = arccos((F_x * vx + F_y * vy) / \
             (sqrt(F_x**2 + F_y**2) * sqrt(vx**2 + vy**2)))
         F_x_final = F_alpha_r * cos(nu)
