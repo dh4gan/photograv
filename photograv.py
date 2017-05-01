@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+
 import numpy
 import matplotlib
 from matplotlib import pyplot as plt
@@ -7,6 +7,7 @@ from matplotlib.ticker import ScalarFormatter
 from numpy import arctan, arctan2, sqrt, pi, sin, cos, arccos, radians
 from scipy import optimize
 
+import vector
 
 """Provide constants"""
 
@@ -42,116 +43,85 @@ def quadratic_limb_darkening(impact, limb1, limb2):
     return 1 - limb1 * (1 - impact) - limb2 * (1 - impact) ** 2
 
 
-def get_gravity_force(px_ship, py_ship, pz_ship, mass_ship, mass_star):
+def get_gravity_force(position, mass_ship, mass_star):
     """Return the gravity force in x and y directions"""
 
-    distance = sqrt(px_ship**2 + py_ship**2 + pz_ship**2)
+    distance = position.mag()
     force = -G * mass_ship * mass_star / (distance**3)
+    force = position.scalarmult(force)
 
-    fx = force*px_ship
-    fy = force*py_ship
-    fz = force*pz_ship
-
-    return fx, fy,fz
+    return force
 
 
-def get_photon_force(x, y, vx, vy, R_star, L_star, ship_sail_area):
-    """Return the photon force in x and y directions"""
+def get_photon_force(position, velocity, starposition, R_star, L_star, ship_sail_area):
+    """Returns the photon force in 3D"""
+   
+    r = position.subtract(starposition).mag() # distance between sail and x,y=(0,0) in m
 
-    r = sqrt((x**2) + (y**2))  # distance between sail and x,y=(0,0) in m
+    
+    # Radial photon pressure force
+    F_photon_r = L_star * ship_sail_area / (3 * pi * c * R_star**2) * \
+            (1 - (1 - (R_star / r)**2)**(1.5))
 
-    if x != 0:  # prevent division by zero if float x == 0
-        phi = arctan(y / x)  # angle in radians
-    else:
-        phi = 0
+    # Now need to adjust sail alignment
+    # Maximum deceleration when sail normal parallel to velocity
+    sail_normal = velocity.unitVector().scalarmult(-1.0)
 
-    def get_F_alpha_r(alpha):
-        return L_star * ship_sail_area / (3 * pi * c * R_star**2) * \
-            (1 - (1 - (R_star / r)**2)**(3 / 2.)) * cos(alpha)
+    # If normal points towards star, flip it!
+    rdotn = sail_normal.dot(position.unitVector())
+    #if(rdotn < 0.0):
+    #    sail_normal = sail_normal.scalarmult(-1.0)
+    #    rdotn = sail_normal.dot(position.unitVector())
+      
+    F_photon_r = 0.9*F_photon_r*rdotn
+    F_photon = sail_normal.scalarmult(F_photon_r)
 
-    def photon_function(alpha):
-        F_alpha_r = get_F_alpha_r(alpha)
-        F_x = F_alpha_r * cos(alpha + phi)
-        F_y = F_alpha_r * sin(alpha + phi)
-        
-        nu = arccos((F_x * vx + F_y * vy) / \
-            (sqrt(F_x**2 + F_y**2) * sqrt(vx**2 + vy**2)))
-        F_x_final = F_alpha_r * cos(nu)
-        return F_x_final
+    return F_photon, sail_normal
 
-    alpha_min = optimize.fmin_slsqp(
-        photon_function,
-        bounds=[(-0.5 * pi, +0.5 * pi)],
-        x0=0,
-        disp=0)
-
-    # Calculate F_x and F_y for best alpha_min
-    F_alpha_r = get_F_alpha_r(alpha_min)
-    F_x = F_alpha_r * numpy.cos(alpha_min + phi)
-    F_y = F_alpha_r * numpy.sin(alpha_min + phi)
-    return F_x[0], F_y[0], alpha_min
-
-
-def get_magnetic_field_dipole(px,py,pz, mx,my,mz, starx,stary,starz):
+def get_magnetic_field_dipole(position, magmoment,starposition):
     '''Returns a spherically symmetric dipole magnetic field
     NB: Calculated in 3D'''
 
-    sepx = px-starx
-    sepy = py-stary
-    sepz = pz-starz
-    sep2 = sepx*sepx + sepy*sepy
+    sepvector = position.subtract(starposition)
+    sep2 = sepvector.mag()
     sep3 = sep2*numpy.sqrt(sep2)
     sep5 = sep3*sep2
     
-    mdotr = mx*sepx + my*sepy +mz*sepz
+    mdotr = magmoment.dot(sepvector)
     
     prefac = mu0/(4.0*numpy.pi)
     
-    Bx = prefac*(3.0*mdotr*sepx/(sep5) - mx/sep3)
-    By = prefac*(3.0*mdotr*sepy/(sep5) - my/sep3)
-    Bz = prefac*(3.0*mdotr*sepz/sep5 - mz/sep3)
-
-    return Bx, By, Bz
-
-def get_magnetic_force(charge,px,py,pz,vx,vy,vz,mx,my,mz,starx,stary):
+    Bfield = sepvector.scalarmult(3.0*prefac*mdotr/sep5)
+    Bfield = Bfield.subtract(magmoment.scalarmult(-prefac/sep3))
     
-    Bx,By,Bz = get_magnetic_field_dipole(px,py,mx,my,starx,stary)
-    
-    vcrossBx = vy*Bz - vz*By
-    vcrossBy = vz*Bx - vx*Bz
-    vcrossBz = vx*By - vy*Bx
-    
-    Fmagx = charge*vcrossBx
-    Fmagy = charge*vcrossBy
-    Fmagz = charge*vcrossBz
-    
-    return Fmagx,Fmagy,Fmagz
+    return Bfield
 
-
-def integrate(Fx,Fy,Fz,vx,vy,vz,px,py,pz,ship_mass, timestep):
+def get_magnetic_force(charge,position,velocity,magmoment,starposition):
+    
+    Bfield = get_magnetic_field_dipole(position,magmoment,starposition,)
+    
+    return velocity.cross(Bfield).scalarmult(charge)
+   
+def integrate(force,position, velocity,ship_mass, timestep):
     '''Integrates the system given a total force F'''
     
-    vxnew = vx + Fx/ship_mass * timestep
-    vynew = vy + Fy/ship_mass * timestep
-    vznew = vz + Fz/ship_mass * timestep
+    newvelocity = velocity.add(force.scalarmult(timestep/ship_mass))
+    newposition = position.add(newvelocity.scalarmult(timestep))
     
-    pxnew = px + vxnew*timestep
-    pynew = py + vynew*timestep
-    pznew = pz + vznew*timestep
-    
-    return pxnew,pynew,pznew, vxnew,vynew,vznew
+    return newposition, newvelocity
     
 
 def fly(
-    px,
-    py,
-    vx,
-    vy,
+    position,
+    velocity,
     ship_mass,
     ship_sail_area,
+    ship_charge,
     M_star,
     R_star,
     L_star,
+    star_position,
+    magmom_star,
     minimum_distance_from_star,
     afterburner_distance,
     timestep,
@@ -165,66 +135,60 @@ def fly(
                                ('time', 'int32'),
                                ('px', 'f8'),
                                ('py', 'f8'),
+                               ('pz', 'f8'),
+                               ('vx', 'f8'),
+                               ('vy', 'f8'),
+                               ('vz', 'f8'),
+                               ('sail_x', 'f8'),
+                               ('sail_y', 'f8'),
+                               ('sail_z', 'f8'),
+                               ('sail_angle', 'f8'),
                                ('F_gravity', 'f8'),
                                ('F_photon', 'f8'),
+                               ('F_magnetic', 'f8'),
+                               ('F_photon_x','f8'),
+                               ('F_photon_y','f8'),
+                               ('F_photon_z','f8'),
                                ('photon_acceleration', 'f8'),
                                ('ship_speed', 'f8'),
-                               ('alpha', 'f8'),
                                ('stellar_distance', 'f8'),
                                ('sail_not_parallel', 'bool')])
     result_array[:] = numpy.NAN
     deceleration_phase = True
 
-    
-    # Hard code a magnetic moment aligned with the z-axis
-    mx = 0.0
-    my = 0.0
-    mz = 1.0
-    charge = 1.0
-
-    pz = 0.0
-    vz = 0.0
-
+    print 'Beginning flight'
     # Main loop
     for step in range(number_of_steps):
-
-        total_F_x = 0.0
-        total_F_y = 0.0
-        total_F_z = 0.0
-
-        # Gravity force
-        gravity_F_x, gravity_F_y = get_gravity_force(
-            px, py, ship_mass, M_star)
         
-        
-        total_F_x +=gravity_F_x
-        total_F_y +=gravity_F_y
-        
-
-        # Magnetic Force is velocity dependent! Needs better integration scheme
-        mag_F_x, mag_F_y, mag_F_z = get_magnetic_force(charge,px,py,0.0,vx,vy,0.0,mx,my,mz,0.0,0.0)
-
-        total_F_x +=mag_F_x
-        total_F_y +=mag_F_y
-        total_F_z +=mag_F_z
-
         # Check distance from star
-        star_distance = sqrt((px / R_star) ** 2 + (py / R_star) ** 2)
+        star_distance = position.subtract(star_position).mag()
+        
+        # Inferno time: If we are inside the star, the simulation ends
+        if star_distance < R_star:
+            print('Exit due to ship being inside the star.')
+            break
+
+        total_Force = vector.Vector3D(0.0,0.0,0.0)
+    
+        # Gravity force
+        gravity_Force = get_gravity_force(position, ship_mass, M_star)
+        total_Force = total_Force.add(gravity_Force)
+    
+        # Magnetic Force is velocity dependent! Needs better integration scheme
+        magnetic_Force = get_magnetic_force(ship_charge,position,velocity,star_position, magmom_star)
+        #total_Force = total_Force.add(magnetic_Force)
 
         # Check if we are past closest encounter. If yes, switch sail off
         previous_distance = result_array['stellar_distance'][step-1]
         if step > 2 and star_distance > previous_distance:
+            print "Past closest approach: disengaging sail"
             deceleration_phase = False
 
         # Check if we are past the star and at afterburner distance
         # If yes, switch sail on again
-        if not return_mission and py < 0 and star_distance > afterburner_distance:
+        if not return_mission and position.y < 0 and star_distance > afterburner_distance:
+            print "At Afterburner distance"
             deceleration_phase = True  # Actually acceleration now!
-
-        # Inferno time: If we are inside the star, the simulation ends
-        if star_distance < 1.:
-            print('Exit due to ship being inside the star.')
-            break
 
         # In case we are inside the minimum distance, the simulation ends
         if star_distance < minimum_distance_from_star / R_star:
@@ -233,55 +197,61 @@ def fly(
 
         # Special case return mission
         # This is an ugly hardcoded special case. To be optimized in the future
-        if return_mission and px < 0 and py / R_star > 4.75:
+        if return_mission and position.x < 0 and position.y / R_star > 4.75:
             deceleration_phase = True  # Actually acceleration now!
 
         # Photon pressure force
-        photon_F_x, photon_F_y, current_alpha = get_photon_force(
-            px, py, vx, vy, R_star, L_star, ship_sail_area)
+        photon_Force, sail_normal = get_photon_force(
+            position,velocity, star_position,R_star, L_star, ship_sail_area)
 
         # Set sign of photon force
         if deceleration_phase:
-            if px > 0:
-                total_F_x += +photon_F_x
-                total_F_x += +photon_F_y
+            if position.x > 0:
+                total_Force = total_Force.add(photon_Force)
             else:
-                total_F_x += -photon_F_x 
-                total_F_y += -photon_F_y 
+                total_Force = total_Force.subtract(photon_Force)
+                
+        # If we do not decelerate: sail shall be parallel with zero photon force
+        if not deceleration_phase:
+            photon_Force = vector.Vector3D(0.0,0.0,0.0)
 
         # Update positions
-        px,py,pz,vx,vy,vz = integrate(total_F_x,total_F_y,total_F_z,vx,vy,vz,px,py,pz,ship_mass, timestep)
+        position,velocity = integrate(total_Force,position,velocity,ship_mass, timestep)
 
         """Calculate interesting values"""
 
-        # If we do not decelerate: sail shall be parallel with zero photon force
-        if not deceleration_phase:
-            photon_F_x = 0
-            photon_F_y = 0
-
-        # Acceleration due to photon pressure only
-        a_photon_x = photon_F_x / ship_mass
-        a_photon_y = photon_F_y / ship_mass
-        a_photon_tot = sqrt(a_photon_x**2 + a_photon_y**2)
-
         # Forces
-        photon_force = sqrt(photon_F_x ** 2 + photon_F_y ** 2)
-        gravity_force = sqrt(gravity_F_x ** 2 + gravity_F_y ** 2)
-        probe_velocity = sqrt(abs(vx) ** 2 + abs(vy) ** 2)
-
+        photon_Force_mag = photon_Force.mag()
+        a_photon_tot = photon_Force_mag/ship_mass
+        gravity_Force_mag = gravity_Force.mag()
+        magnetic_Force_mag = magnetic_Force.mag()
+        ship_speed = velocity.mag()
+        
         # Write interesting values into return array
         result_array['step'][step] = step
         result_array['time'][step] = step * timestep
-        result_array['px'][step] = px / sun_radius
-        result_array['py'][step] = py / sun_radius
-        result_array['F_gravity'][step] = gravity_force
-        result_array['F_photon'][step] = photon_force
+        result_array['px'][step] = position.x / sun_radius
+        result_array['py'][step] = position.y / sun_radius
+        result_array['pz'][step] = position.z / sun_radius
+        result_array['vx'][step] = velocity.x
+        result_array['vy'][step] = velocity.y 
+        result_array['vz'][step] = velocity.z 
+        result_array['F_gravity'][step] = gravity_Force_mag
+        result_array['F_photon'][step] = photon_Force_mag
+        result_array['F_magnetic'][step] = magnetic_Force_mag
+        result_array['F_photon_x'][step] = photon_Force.x
+        result_array['F_photon_y'][step] = photon_Force.y
+        result_array['F_photon_z'][step] = photon_Force.z
+        result_array['sail_x'][step] = sail_normal.x
+        result_array['sail_y'][step] = sail_normal.y
+        result_array['sail_z'][step] = sail_normal.z
+        result_array['sail_angle'][step] = arccos(sail_normal.dot(position.unitVector()))
         result_array['photon_acceleration'][step] = a_photon_tot
-        result_array['ship_speed'][step] = probe_velocity/1000.
-        result_array['alpha'][step] = current_alpha
+        result_array['ship_speed'][step] = ship_speed/1000.
         result_array['stellar_distance'][step] = star_distance
         result_array['sail_not_parallel'][step] = deceleration_phase
 
+    print 'Flight complete'
     return result_array
 
 
@@ -340,9 +310,10 @@ def make_figure_flight(
     fig = plt.gcf()
     ax = fig.add_subplot(111, aspect='equal')
 
-    # Flight trajectorie
+    # Flight trajectory
     px_stellar_units = data['px'] * sun_radius / stellar_radius
     py_stellar_units = data['py'] * sun_radius / stellar_radius
+    
     plt.plot(
         px_stellar_units,
         py_stellar_units,
@@ -397,6 +368,7 @@ def make_figure_flight(
         # circle2=plt.Circle((0,0), 5, color=(0.9, 0.9, 0.9), fill=True)
 
         fig.gca().add_artist(circle2)
+        
 
     # Star in the center with limb darkening
     star_quality = 50  # number of shades
@@ -419,6 +391,7 @@ def make_figure_flight(
 
         # print angle
         text_deflection_angle = r'$\delta = {:1.0f} ^\circ$'.format(deflection_angle)
+
         ax.annotate(
             text_deflection_angle,
             xy=(-scale + 1, scale - 2.5),
@@ -463,7 +436,7 @@ def make_figure_flight(
 
                     # Add sail with angle as marker
 
-                    angle = data['alpha'][it.index]
+                    angle = data['sail_angle'][it.index]
                     if y_location > 0:
                         angle = -angle
 
@@ -513,7 +486,7 @@ def make_figure_flight(
             it.iternext()
 
     # Format the figure
-    plt.rc('text', usetex=True)
+    #plt.rc('text', usetex=True)
     plt.rc('font', family='serif')
     minor_ticks = numpy.arange(-scale, scale, 1)
     ax.set_xticks(minor_ticks, minor=True)
@@ -1014,7 +987,7 @@ def make_video_flight(
             current_marker_number = current_marker_number + 1
 
             # Show sail angle as line
-            angle = data['alpha'][it.index]
+            angle = data['sail_angle'][it.index]
             if y_location > 0:
                 angle = -angle
 
@@ -1080,7 +1053,7 @@ def make_video_flight(
             ax.annotate(text_time, xy=(-19, -19), fontsize=12)
 
             # Format the figure
-            plt.rc('text', usetex=True)
+            #plt.rc('text', usetex=True)
             plt.rc('font', family='serif')
             minor_ticks = numpy.arange(-scale, scale, 1)
             ax.set_xticks(minor_ticks, minor=True)
