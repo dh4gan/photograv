@@ -58,23 +58,16 @@ def get_photon_force(position, velocity, starposition, R_star, L_star, ship_sail
    
     r = position.subtract(starposition).mag() # distance between sail and x,y=(0,0) in m
 
-    
     # Radial photon pressure force
     F_photon_r = L_star * ship_sail_area / (3 * pi * c * R_star**2) * \
             (1 - (1 - (R_star / r)**2)**(1.5))
 
     # Now need to adjust sail alignment
-    # Maximum deceleration when sail normal parallel to velocity
+    # Maximum deceleration when sail normal antiparallel to velocity
     sail_normal = velocity.unitVector().scalarmult(-1.0)
-
-    # If normal points towards star, flip it!
-    rdotn = sail_normal.dot(position.unitVector())
-    #if(rdotn < 0.0):
-    #    sail_normal = sail_normal.scalarmult(-1.0)
-    #    rdotn = sail_normal.dot(position.unitVector())
-      
-    F_photon_r = 0.9*F_photon_r*rdotn
-    F_photon = sail_normal.scalarmult(F_photon_r)
+    
+    rdotn = sail_normal.dot(position.unitVector())    
+    F_photon = sail_normal.scalarmult(rdotn*F_photon_r)
 
     return F_photon, sail_normal
 
@@ -181,7 +174,7 @@ def fly(
         # Check if we are past closest encounter. If yes, switch sail off
         previous_distance = result_array['stellar_distance'][step-1]
         if step > 2 and star_distance > previous_distance:
-            print "Past closest approach: disengaging sail"
+            if deceleration_phase:print "Past closest approach: disengaging sail"
             deceleration_phase = False
 
         # Check if we are past the star and at afterburner distance
@@ -204,12 +197,8 @@ def fly(
         photon_Force, sail_normal = get_photon_force(
             position,velocity, star_position,R_star, L_star, ship_sail_area)
 
-        # Set sign of photon force
         if deceleration_phase:
-            if position.x > 0:
-                total_Force = total_Force.add(photon_Force)
-            else:
-                total_Force = total_Force.subtract(photon_Force)
+            total_Force = total_Force.add(photon_Force)
                 
         # If we do not decelerate: sail shall be parallel with zero photon force
         if not deceleration_phase:
@@ -219,13 +208,6 @@ def fly(
         position,velocity = integrate(total_Force,position,velocity,ship_mass, timestep)
 
         """Calculate interesting values"""
-
-        # Forces
-        photon_Force_mag = photon_Force.mag()
-        a_photon_tot = photon_Force_mag/ship_mass
-        gravity_Force_mag = gravity_Force.mag()
-        magnetic_Force_mag = magnetic_Force.mag()
-        ship_speed = velocity.mag()
         
         # Write interesting values into return array
         result_array['step'][step] = step
@@ -233,12 +215,12 @@ def fly(
         result_array['px'][step] = position.x / sun_radius
         result_array['py'][step] = position.y / sun_radius
         result_array['pz'][step] = position.z / sun_radius
-        result_array['vx'][step] = velocity.x
-        result_array['vy'][step] = velocity.y 
-        result_array['vz'][step] = velocity.z 
-        result_array['F_gravity'][step] = gravity_Force_mag
-        result_array['F_photon'][step] = photon_Force_mag
-        result_array['F_magnetic'][step] = magnetic_Force_mag
+        result_array['vx'][step] = velocity.x / 1000
+        result_array['vy'][step] = velocity.y / 1000
+        result_array['vz'][step] = velocity.z / 1000
+        result_array['F_gravity'][step] = gravity_Force.mag()
+        result_array['F_photon'][step] = photon_Force.mag()
+        result_array['F_magnetic'][step] = magnetic_Force.mag()
         result_array['F_photon_x'][step] = photon_Force.x
         result_array['F_photon_y'][step] = photon_Force.y
         result_array['F_photon_z'][step] = photon_Force.z
@@ -246,8 +228,8 @@ def fly(
         result_array['sail_y'][step] = sail_normal.y
         result_array['sail_z'][step] = sail_normal.z
         result_array['sail_angle'][step] = arccos(sail_normal.dot(position.unitVector()))
-        result_array['photon_acceleration'][step] = a_photon_tot
-        result_array['ship_speed'][step] = ship_speed/1000.
+        result_array['photon_acceleration'][step] = photon_Force.mag()/ship_mass
+        result_array['ship_speed'][step] = velocity.mag()/1000.
         result_array['stellar_distance'][step] = star_distance
         result_array['sail_not_parallel'][step] = deceleration_phase
 

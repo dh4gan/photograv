@@ -10,7 +10,7 @@ minimum_distance_from_star = 5 * R_star_CenA  # closest distance to star. Only u
 
 ship_mass = .001  # [kg]
 
-ship_position = vector.Vector3D(3.0*R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
+ship_position = vector.Vector3D(2.8*R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
 
 ship_charge = 1
@@ -45,9 +45,9 @@ ax2.plot(data['time'],data['F_photon_x'],label='Fx')
 ax2.plot(data['time'],data['F_photon_y'],label='Fy')
 ax3.plot(data['time'],data['vx'],label='vx')
 ax3.plot(data['time'],data['vy'],label='vy')
-ax1.set_xlim(1180000,1220000)
-ax2.set_xlim(1180000,1220000)
-ax3.set_xlim(1180000,1220000)
+#ax1.set_xlim(1180000,1220000)
+#ax2.set_xlim(1180000,1220000)
+#ax3.set_xlim(1180000,1220000)
 #ax1.plot(data['time'],data['vx'],label='vx')
 #ax1.plot(data['time'],data['vy'],label='vy')
 ax1.legend(loc='lower right')
