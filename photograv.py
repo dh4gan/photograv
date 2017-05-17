@@ -21,7 +21,7 @@ epsilon0 = 8.85418782e-12 # permittivity of free space (SI units)
 sun_radius = 695700000  # [m]
 sun_mass = 1.989 * 10**30  # [kg]
 sun_luminosity = 3.86 * 10**26  # [Watt] stellar luminosity
-sun_magnetic_moment = 3.5e29 # [N m /T] stellar magnetic moment
+sun_Bfield_1AU = 5.0e-9 # Solar magnetic field strength at 1 AU (Tesla)
 
 # CenA:
 L_star_CenA = sun_luminosity * 1.522
@@ -58,7 +58,7 @@ def get_gravity_force(position, mass_ship, mass_star):
 def get_photon_force(position, velocity, starposition, R_star, L_star, ship_sail_area):
     """Returns the photon force in 3D"""
    
-    r = position.subtract(starposition).mag() # distance between sail and x,y=(0,0) in m
+    r = position.subtract(starposition).mag() # distance between sail and star in m
 
     # Radial photon pressure force
     F_photon_r = L_star * ship_sail_area / (3 * pi * c * R_star**2) * \
@@ -73,26 +73,30 @@ def get_photon_force(position, velocity, starposition, R_star, L_star, ship_sail
 
     return F_photon, sail_normal
 
-def get_magnetic_field_dipole(position, magmoment,starposition):
+def get_magnetic_field_dipole(position, Bfield_1AU, magmoment,starposition):
     '''Returns a spherically symmetric dipole magnetic field
     NB: Calculated in 3D'''
 
-    sepvector = position.subtract(starposition)
-    sep2 = sepvector.mag()
-    sep3 = sep2*numpy.sqrt(sep2)
+    sepvector = position.subtract(starposition).scalarmult(1.0/AU)
+    
+    sep = sepvector.mag()
+    sep2 = sep*sep
+    sep3 = sep2*sep
+    
+    sepvector = sepvector.unitVector()
     
     mdotr = magmoment.dot(sepvector)
     
-    prefac = mu0/(4.0*numpy.pi*sep3)
+    prefac = Bfield_1AU/sep3
     
-    Bfield = sepvector.scalarmult(3.0*prefac*mdotr/sep2)
-    Bfield = Bfield.subtract(magmoment.scalarmult(-prefac))
+    Bfield = sepvector.scalarmult(3.0*prefac*mdotr)
+    Bfield = Bfield.subtract(magmoment.scalarmult(prefac))
 
     return Bfield
 
-def get_magnetic_force(charge,position,velocity,magmoment,starposition):
+def get_magnetic_force(charge,position,velocity,Bfield_1AU,magmoment,starposition):
     
-    Bfield = get_magnetic_field_dipole(position,magmoment,starposition)
+    Bfield = get_magnetic_field_dipole(position,Bfield_1AU,magmoment,starposition)
     
     return Bfield,velocity.cross(Bfield).scalarmult(charge)
    
@@ -114,8 +118,9 @@ def fly(
     M_star,
     R_star,
     L_star,
-    star_position,
     magmom_star,
+    Bfield_1AU,
+    star_position,
     minimum_distance_from_star,
     afterburner_distance,
     timestep,
@@ -172,8 +177,8 @@ def fly(
         total_Force = total_Force.add(gravity_Force)
     
         # Magnetic Force is velocity dependent! Needs better integration scheme
-        Bfield, magnetic_Force = get_magnetic_force(ship_charge,position,velocity,star_position, magmom_star)
-        #total_Force = total_Force.add(magnetic_Force)
+        Bfield, magnetic_Force = get_magnetic_force(ship_charge,position,velocity,Bfield_1AU, magmom_star, star_position)
+        total_Force = total_Force.add(magnetic_Force)
 
         # Check if we are past closest encounter. If yes, switch sail off
         previous_distance = result_array['stellar_distance'][step-1]
