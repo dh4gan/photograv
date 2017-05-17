@@ -15,11 +15,13 @@ G = 6.67428e-11  # the gravitational constant G
 c = 299792458  # [m/sec] speed of light
 AU = (149.6e6 * 1000)  # [m] 149.6 million km
 mu0 = 1e-7*4.0*pi # permeability of free space (SI units)
+epsilon0 = 8.85418782e-12 # permittivity of free space (SI units)
 
 # Sun
 sun_radius = 695700000  # [m]
 sun_mass = 1.989 * 10**30  # [kg]
 sun_luminosity = 3.86 * 10**26  # [Watt] stellar luminosity
+sun_magnetic_moment = 3.5e29 # [N m /T] stellar magnetic moment
 
 # CenA:
 L_star_CenA = sun_luminosity * 1.522
@@ -78,22 +80,21 @@ def get_magnetic_field_dipole(position, magmoment,starposition):
     sepvector = position.subtract(starposition)
     sep2 = sepvector.mag()
     sep3 = sep2*numpy.sqrt(sep2)
-    sep5 = sep3*sep2
     
     mdotr = magmoment.dot(sepvector)
     
-    prefac = mu0/(4.0*numpy.pi)
+    prefac = mu0/(4.0*numpy.pi*sep3)
     
-    Bfield = sepvector.scalarmult(3.0*prefac*mdotr/sep5)
-    Bfield = Bfield.subtract(magmoment.scalarmult(-prefac/sep3))
-    
+    Bfield = sepvector.scalarmult(3.0*prefac*mdotr/sep2)
+    Bfield = Bfield.subtract(magmoment.scalarmult(-prefac))
+
     return Bfield
 
 def get_magnetic_force(charge,position,velocity,magmoment,starposition):
     
-    Bfield = get_magnetic_field_dipole(position,magmoment,starposition,)
+    Bfield = get_magnetic_field_dipole(position,magmoment,starposition)
     
-    return velocity.cross(Bfield).scalarmult(charge)
+    return Bfield,velocity.cross(Bfield).scalarmult(charge)
    
 def integrate(force,position, velocity,ship_mass, timestep):
     '''Integrates the system given a total force F'''
@@ -142,6 +143,9 @@ def fly(
                                ('F_photon_x','f8'),
                                ('F_photon_y','f8'),
                                ('F_photon_z','f8'),
+                               ('F_mag_x','f8'),
+                               ('F_mag_y','f8'),
+                               ('F_mag_z','f8'),
                                ('photon_acceleration', 'f8'),
                                ('ship_speed', 'f8'),
                                ('stellar_distance', 'f8'),
@@ -168,19 +172,19 @@ def fly(
         total_Force = total_Force.add(gravity_Force)
     
         # Magnetic Force is velocity dependent! Needs better integration scheme
-        magnetic_Force = get_magnetic_force(ship_charge,position,velocity,star_position, magmom_star)
+        Bfield, magnetic_Force = get_magnetic_force(ship_charge,position,velocity,star_position, magmom_star)
         #total_Force = total_Force.add(magnetic_Force)
 
         # Check if we are past closest encounter. If yes, switch sail off
         previous_distance = result_array['stellar_distance'][step-1]
         if step > 2 and star_distance > previous_distance:
-            if deceleration_phase:print "Past closest approach: disengaging sail"
+            #if deceleration_phase:print "Past closest approach: disengaging sail"
             deceleration_phase = False
 
         # Check if we are past the star and at afterburner distance
         # If yes, switch sail on again
         if not return_mission and position.y < 0 and star_distance > afterburner_distance:
-            print "At Afterburner distance"
+            #print "At Afterburner distance"
             deceleration_phase = True  # Actually acceleration now!
 
         # In case we are inside the minimum distance, the simulation ends
@@ -224,6 +228,9 @@ def fly(
         result_array['F_photon_x'][step] = photon_Force.x
         result_array['F_photon_y'][step] = photon_Force.y
         result_array['F_photon_z'][step] = photon_Force.z
+        result_array['F_mag_x'][step] = magnetic_Force.x
+        result_array['F_mag_y'][step] = magnetic_Force.y
+        result_array['F_mag_z'][step] = magnetic_Force.z
         result_array['sail_x'][step] = sail_normal.x
         result_array['sail_y'][step] = sail_normal.y
         result_array['sail_z'][step] = sail_normal.z
@@ -233,6 +240,7 @@ def fly(
         result_array['stellar_distance'][step] = star_distance
         result_array['sail_not_parallel'][step] = deceleration_phase
 
+        #print photon_Force.mag(), gravity_Force.mag(), magnetic_Force.mag()
     print 'Flight complete'
     return result_array
 

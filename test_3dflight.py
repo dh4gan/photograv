@@ -1,7 +1,7 @@
 from photograv import *
 
 # Define spaceship:
-number_of_steps = 10000  # 300000
+number_of_steps = 100000  # 300000
 timestep = 60 * 5  # 0.1 One timestep every 5 minutes
 ship_sail_area = 10  # sail surface im square meters. Weight is 1g hard-coded.
 afterburner_distance = 10e10  # [R_star]
@@ -14,7 +14,8 @@ ship_position = vector.Vector3D(2.8*R_star_CenA,10.0*AU,0.0) # start position ve
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
 
 ship_charge = 1
-magmom_star_CenA = vector.Vector3D(0.0,0.0,1.0)
+magmom_star_CenA = vector.Vector3D(0.0,0.0,0.0).scalarmult(sun_magnetic_moment)
+#magmom_star_CenA.rotateX(0.85)
 star_position = vector.Vector3D(0.0,0.0,0.0)
 
 
@@ -43,16 +44,20 @@ ax1.plot(data['time'],data['sail_angle'], label='sailangle')
 #ax1.plot(data['time'],data['sail_y'],label='saily')
 ax2.plot(data['time'],data['F_photon_x'],label='Fx')
 ax2.plot(data['time'],data['F_photon_y'],label='Fy')
-ax3.plot(data['time'],data['vx'],label='vx')
-ax3.plot(data['time'],data['vy'],label='vy')
+ax2.plot(data['time'],data['F_mag_x'], label='Fmagx')
+ax2.plot(data['time'],data['F_mag_y'], label='Fmagy')
+#ax2.plot(data['time'],data['F_mag_z'], label='Fmagz')
+ax3.plot(data['time'],data['px'],label='x')
+ax3.plot(data['time'],data['py'],label='y')
+ax3.plot(data['time'],data['pz'],label='z')
 #ax1.set_xlim(1180000,1220000)
 #ax2.set_xlim(1180000,1220000)
 #ax3.set_xlim(1180000,1220000)
 #ax1.plot(data['time'],data['vx'],label='vx')
 #ax1.plot(data['time'],data['vy'],label='vy')
-ax1.legend(loc='lower right')
-ax2.legend(loc='lower right')
-ax3.legend(loc='lower right')
+ax1.legend(loc='lower left')
+ax2.legend(loc='lower left')
+ax3.legend(loc='lower left')
 
 plt.show()
 
