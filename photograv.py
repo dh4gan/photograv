@@ -4,9 +4,8 @@ import matplotlib
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import ScalarFormatter
-from numpy import arctan, arctan2, sqrt, pi, sin, cos, arccos, radians
+from numpy import arctan2, sqrt, pi, sin, cos, arccos, radians
 from scipy import optimize
-import sys
 import vector
 
 """Provide constants"""
@@ -199,7 +198,7 @@ def fly(
         gravity_Force = get_gravity_force(position, ship_mass, M_star)
         total_Force = total_Force.add(gravity_Force)
     
-        # Magnetic Force is velocity dependent! Needs better integration scheme
+        # Magnetic Force is velocity dependent!
         Bfield, magnetic_Force = get_magnetic_force(ship_charge,position,velocity,Bfield_1AU, magmom_star, star_position)
         total_Force = total_Force.add(magnetic_Force)
 
@@ -234,7 +233,7 @@ def fly(
                 
         # If we do not decelerate: sail shall be parallel with zero photon force
         if not deceleration_phase:
-            sail_normal = position.cross(velocity)
+            sail_normal = position.cross(velocity).unitVector() # sail normal to both position and velocity (zero force)
             photon_Force = vector.Vector3D(0.0,0.0,0.0)
 
         # Update positions
@@ -263,7 +262,7 @@ def fly(
         result_array['sail_x'][step] = sail_normal.x
         result_array['sail_y'][step] = sail_normal.y
         result_array['sail_z'][step] = sail_normal.z
-        result_array['sail_angle'][step] = arccos(sail_normal.dot(position.unitVector()))
+        result_array['sail_angle'][step] = arccos(sail_normal.dot(position.unitVector()))    
         result_array['photon_acceleration'][step] = photon_Force.mag()/ship_mass
         result_array['ship_speed'][step] = velocity.mag()/1000.
         result_array['stellar_distance'][step] = star_distance

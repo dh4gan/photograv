@@ -10,14 +10,14 @@ minimum_distance_from_star = 5 * R_star_CenA  # closest distance to star. Only u
 
 ship_mass = .001  # [kg]
 
-ship_position = vector.Vector3D(2.8*R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
+ship_position = vector.Vector3D(3.1*R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
 
-ship_charge = 0.0
+ship_charge = 1.0e-5
 magmom_star_CenA = vector.Vector3D(0.0,0.0,1.0) # unit vector describing the stellar dipole
 B_field_1AU_CenA = sun_Bfield_1AU
 
-magmom_star_CenA.rotateX(0.85)
+#magmom_star_CenA.rotateX(0.85)
 star_position = vector.Vector3D(0.0,0.0,0.0)
 
 
