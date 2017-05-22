@@ -1,7 +1,7 @@
 from photograv import *
 
 # Define spaceship:
-number_of_steps = 100000  # 300000
+number_of_steps = 10000  # 300000
 timestep = 60 * 5  # 0.1 One timestep every 5 minutes
 ship_sail_area = 10  # sail surface im square meters. Weight is 1g hard-coded.
 afterburner_distance = 10e10  # [R_star]
@@ -13,7 +13,7 @@ ship_mass = .001  # [kg]
 ship_position = vector.Vector3D(2.8*R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
 
-ship_charge = 1.0e-3
+ship_charge = 0.0
 magmom_star_CenA = vector.Vector3D(0.0,0.0,1.0) # unit vector describing the stellar dipole
 B_field_1AU_CenA = sun_Bfield_1AU
 
@@ -42,18 +42,19 @@ data = fly(
 
 fig1 = plt.figure()
 ax1 = fig1.add_subplot(311)
-ax1.set_xlim(1.16e6,1.18e6)
+ax1.set_xlim(1.1e6,1.2e6)
 ax1.plot(data['time'], data['F_photon_x'], label='Fphoton_x', color='blue')
 ax1.plot(data['time'], data['F_photon_y'], label='Fphoton_y', color = 'green')
 ax1.plot(data['time'], data['F_mag_x'], label='Fmagx', color='blue', linestyle='dashed')
 ax1.plot(data['time'], data['F_mag_y'], label='Fmagy', color = 'green',linestyle='dashed')
 ax1.legend(loc='upper left')
 ax2 = fig1.add_subplot(312)
-ax2.set_xlim(1.16e6,1.18e6)
-ax2.plot(data['time'], data['py'], label='speed', color='black')
+ax2.set_xlim(1.1e6,1.2e6)
+#ax2.plot(data['time'], data['sail_x'], label='nx', color='black')
+ax2.plot(data['time'],data['ship_speed'], label='speed', color='black')
 ax2.legend(loc='lower left')
 ax3 = fig1.add_subplot(313)
-ax3.set_xlim(1.16e6,1.18e6)
+ax3.set_xlim(1.1e6,1.2e6)
 ax3.plot(data['time'],data['sail_angle'], label = 'alpha', color='red')
 ax3.legend(loc='upper left')
 ax3.set_xlabel('Time')

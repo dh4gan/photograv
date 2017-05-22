@@ -6,7 +6,7 @@ from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import ScalarFormatter
 from numpy import arctan, arctan2, sqrt, pi, sin, cos, arccos, radians
 from scipy import optimize
-
+import sys
 import vector
 
 """Provide constants"""
@@ -55,6 +55,28 @@ def get_gravity_force(position, mass_ship, mass_star):
     return force
 
 
+def optimise_sail(position,velocity):
+    """Finds the sail normal (n) that optimises the craft's deceleration
+    Optimised when (n.r)(n.v) is minimised"""
+    
+    def sailfunction(nvalues, position,velocity):
+        
+        r = position.unitVector()
+        v = velocity.unitVector()
+        n = vector.Vector3D(nvalues[0],nvalues[1],nvalues[2]).unitVector()
+        
+        return n.dot(v)*n.dot(r)
+    
+    firstguess = [1.0,0.0,0.0]
+
+    n_optimal = optimize.minimize(sailfunction, firstguess,args=(position,velocity), method='SLSQP',bounds=((-1,1),(-1,1),(-1,1)), tol=1.0e-10)
+    
+    sail_normal = vector.Vector3D(n_optimal.x[0],n_optimal.x[1],n_optimal.x[2])
+    sail_normal = sail_normal.unitVector()
+
+    return sail_normal
+
+
 def get_photon_force(position, velocity, starposition, R_star, L_star, ship_sail_area):
     """Returns the photon force in 3D"""
    
@@ -65,8 +87,9 @@ def get_photon_force(position, velocity, starposition, R_star, L_star, ship_sail
             (1 - (1 - (R_star / r)**2)**(1.5))
 
     # Now need to adjust sail alignment
-    # Maximum deceleration when sail normal antiparallel to velocity
-    sail_normal = velocity.unitVector().scalarmult(-1.0)
+    # Maximum deceleration when sail normal minimises (n.r)(n.v)
+    
+    sail_normal = optimise_sail(position,velocity)
     
     rdotn = sail_normal.dot(position.unitVector())    
     F_photon = sail_normal.scalarmult(rdotn*F_photon_r)
@@ -211,6 +234,7 @@ def fly(
                 
         # If we do not decelerate: sail shall be parallel with zero photon force
         if not deceleration_phase:
+            sail_normal = position.cross(velocity)
             photon_Force = vector.Vector3D(0.0,0.0,0.0)
 
         # Update positions
