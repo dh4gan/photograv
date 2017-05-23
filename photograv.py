@@ -4,317 +4,20 @@ import matplotlib
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from matplotlib.ticker import ScalarFormatter
-from numpy import arctan2, sqrt, pi, sin, cos, arccos, radians
-from scipy import optimize
-import vector
+from numpy import arctan2, sqrt, pi, sin, cos, radians
 
-"""Provide constants"""
+import star as st
 
-G = 6.67428e-11  # the gravitational constant G
-c = 299792458  # [m/sec] speed of light
-AU = (149.6e6 * 1000)  # [m] 149.6 million km
-mu0 = 1e-7*4.0*pi # permeability of free space (SI units)
-epsilon0 = 8.85418782e-12 # permittivity of free space (SI units)
-
-# Sun
-sun_radius = 695700000  # [m]
-sun_mass = 1.989 * 10**30  # [kg]
-sun_luminosity = 3.86 * 10**26  # [Watt] stellar luminosity
-sun_Bfield_1AU = 5.0e-9 # Solar magnetic field strength at 1 AU (Tesla)
-
-# CenA:
-L_star_CenA = sun_luminosity * 1.522
-R_star_CenA = sun_radius * 1.224
-M_star_CenA = sun_mass * 1.105
-
-# CenB:
-L_star_CenB = sun_luminosity * 0.503
-R_star_CenB = sun_radius * 0.863
-M_star_CenB = sun_mass * 0.934
-
-# CenC:
-L_star_CenC = sun_luminosity * 138 * 10e-6
-R_star_CenC = sun_radius * 0.145
-M_star_CenC = sun_mass * 0.123
-
+from star import sun_radius
 
 def quadratic_limb_darkening(impact, limb1, limb2):
     "Quadratic limb darkening. Kopal 1950, Harvard Col. Obs. Circ., 454, 1"
     impact = cos(1 - impact)
     return 1 - limb1 * (1 - impact) - limb2 * (1 - impact) ** 2
 
-
-def get_gravity_force(position, mass_ship, mass_star):
-    """Return the gravity force in x and y directions"""
-
-    distance = position.mag()
-    force = -G * mass_ship * mass_star / (distance**3)
-    force = position.scalarmult(force)
-
-    return force
-
-
-def optimise_sail(position,velocity):
-    """Finds the sail normal (n) that optimises the craft's deceleration
-    Optimised when (n.r)(n.v) is minimised"""
-    
-    def sailfunction(nvalues, position,velocity):
-        
-        r = position.unitVector()
-        v = velocity.unitVector()
-        n = vector.Vector3D(nvalues[0],nvalues[1],nvalues[2]).unitVector()
-        
-        return n.dot(v)*n.dot(r)
-    
-    firstguess = [1.0,0.0,0.0]
-
-    n_optimal = optimize.minimize(sailfunction, firstguess,args=(position,velocity), method='SLSQP',bounds=((-1,1),(-1,1),(-1,1)), tol=1.0e-10)
-    
-    sail_normal = vector.Vector3D(n_optimal.x[0],n_optimal.x[1],n_optimal.x[2])
-    sail_normal = sail_normal.unitVector()
-
-    return sail_normal
-
-
-def get_photon_force(position, velocity, starposition, R_star, L_star, ship_sail_area):
-    """Returns the photon force in 3D"""
-   
-    r = position.subtract(starposition).mag() # distance between sail and star in m
-
-    # Radial photon pressure force
-    F_photon_r = L_star * ship_sail_area / (3 * pi * c * R_star**2) * \
-            (1 - (1 - (R_star / r)**2)**(1.5))
-
-    # Now need to adjust sail alignment
-    # Maximum deceleration when sail normal minimises (n.r)(n.v)
-    
-    sail_normal = optimise_sail(position,velocity)
-    
-    rdotn = sail_normal.dot(position.unitVector())    
-    F_photon = sail_normal.scalarmult(rdotn*F_photon_r)
-
-    return F_photon, sail_normal
-
-def get_magnetic_field_dipole(position, Bfield_1AU, magmoment,starposition):
-    '''Returns a spherically symmetric dipole magnetic field
-    NB: Calculated in 3D'''
-
-    sepvector = position.subtract(starposition).scalarmult(1.0/AU)
-    
-    sep = sepvector.mag()
-    sep2 = sep*sep
-    sep3 = sep2*sep
-    
-    sepvector = sepvector.unitVector()
-    
-    mdotr = magmoment.dot(sepvector)
-    
-    prefac = Bfield_1AU/sep3
-    
-    Bfield = sepvector.scalarmult(3.0*prefac*mdotr)
-    Bfield = Bfield.subtract(magmoment.scalarmult(prefac))
-
-    return Bfield
-
-def get_magnetic_force(charge,position,velocity,Bfield_1AU,magmoment,starposition):
-    
-    Bfield = get_magnetic_field_dipole(position,Bfield_1AU,magmoment,starposition)
-    
-    return Bfield,velocity.cross(Bfield).scalarmult(charge)
-   
-def integrate(force,position, velocity,ship_mass, timestep):
-    '''Integrates the system given a total force F'''
-    
-    newvelocity = velocity.add(force.scalarmult(timestep/ship_mass))
-    newposition = position.add(newvelocity.scalarmult(timestep))
-    
-    return newposition, newvelocity
-    
-
-def fly(
-    position,
-    velocity,
-    ship_mass,
-    ship_sail_area,
-    ship_charge,
-    M_star,
-    R_star,
-    L_star,
-    magmom_star,
-    Bfield_1AU,
-    star_position,
-    minimum_distance_from_star,
-    afterburner_distance,
-    timestep,
-    number_of_steps,
-    return_mission =False):
-    """Loops through the simulation, returns result array"""
-
-    # Data return array
-    result_array = numpy.zeros((number_of_steps,), dtype=[
-                               ('step', 'int32'),
-                               ('time', 'int32'),
-                               ('px', 'f8'),
-                               ('py', 'f8'),
-                               ('pz', 'f8'),
-                               ('vx', 'f8'),
-                               ('vy', 'f8'),
-                               ('vz', 'f8'),
-                               ('sail_x', 'f8'),
-                               ('sail_y', 'f8'),
-                               ('sail_z', 'f8'),
-                               ('sail_angle', 'f8'),
-                               ('F_gravity', 'f8'),
-                               ('F_photon', 'f8'),
-                               ('F_magnetic', 'f8'),
-                               ('F_photon_x','f8'),
-                               ('F_photon_y','f8'),
-                               ('F_photon_z','f8'),
-                               ('F_mag_x','f8'),
-                               ('F_mag_y','f8'),
-                               ('F_mag_z','f8'),
-                               ('photon_acceleration', 'f8'),
-                               ('ship_speed', 'f8'),
-                               ('stellar_distance', 'f8'),
-                               ('sail_not_parallel', 'bool')])
-    result_array[:] = numpy.NAN
-    deceleration_phase = True
-
-    print 'Beginning flight'
-    # Main loop
-    for step in range(number_of_steps):
-        
-        # Check distance from star
-        star_distance = position.subtract(star_position).mag()
-        
-        # Inferno time: If we are inside the star, the simulation ends
-        if star_distance < R_star:
-            print('Exit due to ship being inside the star.')
-            break
-
-        total_Force = vector.Vector3D(0.0,0.0,0.0)
-    
-        # Gravity force
-        gravity_Force = get_gravity_force(position, ship_mass, M_star)
-        total_Force = total_Force.add(gravity_Force)
-    
-        # Magnetic Force is velocity dependent!
-        Bfield, magnetic_Force = get_magnetic_force(ship_charge,position,velocity,Bfield_1AU, magmom_star, star_position)
-        total_Force = total_Force.add(magnetic_Force)
-
-        # Check if we are past closest encounter. If yes, switch sail off
-        previous_distance = result_array['stellar_distance'][step-1]
-        if step > 2 and star_distance > previous_distance:
-            #if deceleration_phase:print "Past closest approach: disengaging sail"
-            deceleration_phase = False
-
-        # Check if we are past the star and at afterburner distance
-        # If yes, switch sail on again
-        if not return_mission and position.y < 0 and star_distance > afterburner_distance:
-            #print "At Afterburner distance"
-            deceleration_phase = True  # Actually acceleration now!
-
-        # In case we are inside the minimum distance, the simulation ends
-        if star_distance < minimum_distance_from_star / R_star:
-            print('Exit due to ship being inside the minimum distance')
-            break
-
-        # Special case return mission
-        # This is an ugly hardcoded special case. To be optimized in the future
-        if return_mission and position.x < 0 and position.y / R_star > 4.75:
-            deceleration_phase = True  # Actually acceleration now!
-
-        # Photon pressure force
-        photon_Force, sail_normal = get_photon_force(
-            position,velocity, star_position,R_star, L_star, ship_sail_area)
-
-        if deceleration_phase:
-            total_Force = total_Force.add(photon_Force)
-                
-        # If we do not decelerate: sail shall be parallel with zero photon force
-        if not deceleration_phase:
-            sail_normal = position.cross(velocity).unitVector() # sail normal to both position and velocity (zero force)
-            photon_Force = vector.Vector3D(0.0,0.0,0.0)
-
-        # Update positions
-        position,velocity = integrate(total_Force,position,velocity,ship_mass, timestep)
-
-        """Calculate interesting values"""
-        
-        # Write interesting values into return array
-        result_array['step'][step] = step
-        result_array['time'][step] = step * timestep
-        result_array['px'][step] = position.x / sun_radius
-        result_array['py'][step] = position.y / sun_radius
-        result_array['pz'][step] = position.z / sun_radius
-        result_array['vx'][step] = velocity.x / 1000
-        result_array['vy'][step] = velocity.y / 1000
-        result_array['vz'][step] = velocity.z / 1000
-        result_array['F_gravity'][step] = gravity_Force.mag()
-        result_array['F_photon'][step] = photon_Force.mag()
-        result_array['F_magnetic'][step] = magnetic_Force.mag()
-        result_array['F_photon_x'][step] = photon_Force.x
-        result_array['F_photon_y'][step] = photon_Force.y
-        result_array['F_photon_z'][step] = photon_Force.z
-        result_array['F_mag_x'][step] = magnetic_Force.x
-        result_array['F_mag_y'][step] = magnetic_Force.y
-        result_array['F_mag_z'][step] = magnetic_Force.z
-        result_array['sail_x'][step] = sail_normal.x
-        result_array['sail_y'][step] = sail_normal.y
-        result_array['sail_z'][step] = sail_normal.z
-        result_array['sail_angle'][step] = arccos(sail_normal.dot(position.unitVector()))    
-        result_array['photon_acceleration'][step] = photon_Force.mag()/ship_mass
-        result_array['ship_speed'][step] = velocity.mag()/1000.
-        result_array['stellar_distance'][step] = star_distance
-        result_array['sail_not_parallel'][step] = deceleration_phase
-
-        #print photon_Force.mag(), gravity_Force.mag(), magnetic_Force.mag()
-    print 'Flight complete'
-    return result_array
-
-
-def print_flight_report(data):
-    print('speed [km/sec] start', '{:10.1f}'.format(data['ship_speed'][1]),
-        ' - speed end', '{:10.1f}'.format(data['ship_speed'][-1]))
-    print('Overall closest encounter to star [stellar radii]',
-        '{:1.3f}'.format(numpy.amin(data['stellar_distance'])))
-
-    index_min = numpy.argmin(data['stellar_distance'])
-    print('Closest encounter at time [min]',
-        '{:1.3f}'.format(numpy.amin(data['time'][index_min] / 60)))
-    print('Closest encounter at speed [km/s]',
-        '{:1.3f}'.format(numpy.amin(data['ship_speed'][index_min])))
-
-    angle = abs(arctan2(data['py'][-1], data['px'][-1]) * (360 / (2 * pi))) - 90
-    print('Deflection angle [degree]',
-        '{:1.1f}'.format(angle), '{:1.1f}'.format(180 - angle))
-    print('Total time range is [seconds]',
-        data['time'][0], 'to', data['time'][-1])
-    has_sail_switched_off = False
-    print(len(data['time']))
-    for step in range(len(data['time'])):
-        speed_change = data['ship_speed'][step] - data['ship_speed'][step-1]  # km/sec
-        time_change = data['time'][step] - data['time'][step-1]  # sec
-        g_force = speed_change / time_change * 1000 / 9.81
-
-        total_force = data['F_photon'][step] - data['F_gravity'][step]
-        gee = total_force / 0.086 / 9.81
-        # print(step, data['stellar_distance'][step], data['ship_speed'][step], speed_change, time_change, g_force, gee)
-
-
-        if data['sail_not_parallel'][step] == False:
-            has_sail_switched_off = True
-            percentage_when_off = data['time'][step] / data['time'][-1] * 100
-            #print('Sail switched off at time [seconds]',
-                #data['time'][step], '{:10.1f}'.format(percentage_when_off), '%')
-            #break
-    if not has_sail_switched_off:
-        print('Sail was always on')
-
-
 def make_figure_flight(
-        data,
-        stellar_radius,
+        sail,
+        star,
         scale,
         flight_color,
         redness,
@@ -325,12 +28,13 @@ def make_figure_flight(
         annotate_cases,
         caption,
         colorbar=True):
+    
     fig = plt.gcf()
     ax = fig.add_subplot(111, aspect='equal')
 
     # Flight trajectory
-    px_stellar_units = data['px'] * sun_radius / stellar_radius
-    py_stellar_units = data['py'] * sun_radius / stellar_radius
+    px_stellar_units = sail.telemetry['px'] * st.sun_radius / star.R
+    py_stellar_units = sail.telemetry['py'] * st.sun_radius / star.R
     
     plt.plot(
         px_stellar_units,
@@ -347,15 +51,15 @@ def make_figure_flight(
 
     if colorbar:
 
-        for step in range(len(data['time'])):
+        for step in range(sail.nsteps):
             # Color bar
             x1 = 15
             x2 = 20
-            y1 = data['py'][step] * sun_radius / stellar_radius
+            y1 = sail.telemetry['py'][step] * st.sun_radius / star.R
             y2 = y1
             if -20 < y1 < 20:
-                speed_change = data['ship_speed'][step] - data['ship_speed'][step-1]  # km/sec
-                time_change = data['time'][step] - data['time'][step-1]  # sec
+                speed_change = sail.telemetry['ship_speed'][step] - sail.telemetry['ship_speed'][step-1]  # km/sec
+                time_change = sail.telemetry['time'][step] - sail.telemetry['time'][step-1]  # sec
                 g_force = speed_change / time_change * 1000 / 9.81
                 colorVal = scalarMap.to_rgba(g_force)
                 plt.plot([x1, x2], [y1, y2], color = colorVal, linewidth = 4.)
@@ -405,7 +109,7 @@ def make_figure_flight(
     if star_name != '':
         ax.annotate(star_name, xy=(-2.5, 1.75))
         deflection_angle = abs(
-            arctan2(data['py'][-1], data['px'][-1]) * (360 / (2 * pi))) - 90
+            arctan2(sail.telemetry['py'][-1], sail.telemetry['px'][-1]) * (360 / (2 * pi))) - 90
 
         # print angle
         text_deflection_angle = r'$\delta = {:1.0f} ^\circ$'.format(deflection_angle)
@@ -416,9 +120,9 @@ def make_figure_flight(
             fontsize=16)
 
         # Add a circle mark at the closest encounter
-        index_min = numpy.argmin(data['stellar_distance'])
-        min_x_location = data['px'][index_min] * sun_radius / stellar_radius
-        min_y_location = data['py'][index_min] * sun_radius / stellar_radius
+        index_min = numpy.argmin(sail.telemetry['stellar_distance'])
+        min_x_location = sail.telemetry['px'][index_min] * sun_radius / star.R
+        min_y_location = sail.telemetry['py'][index_min] * sun_radius / star.R
         marker = plt.Circle(
             (min_x_location, min_y_location), 0.2, color='red', fill=False)
         plt.gcf().gca().add_artist(marker)
@@ -428,17 +132,17 @@ def make_figure_flight(
         ax.annotate(text_weight_ratio, xy=(-scale + 1, scale - 5), fontsize=16)
 
         # print entry speed
-        text_entry_speed = r'$\nu_{{\infty}} = {:10.0f}$ km/s'.format(data['ship_speed'][1])
+        text_entry_speed = r'$\nu_{{\infty}} = {:10.0f}$ km/s'.format(sail.telemetry['ship_speed'][1])
         ax.annotate(text_entry_speed, xy=(-scale + 1, scale - 8), fontsize=16)
 
         # Add circle marks every [circle_spacing_minutes] and annotate them
         current_marker_number = 0
-        it = numpy.nditer(data['time'], flags=['f_index'])
+        it = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
         while not it.finished:
             if (it[0] / 60) % circle_spacing_minutes == 0:
-                x_location = data['px'][it.index] * sun_radius / stellar_radius
-                y_location = data['py'][it.index] * sun_radius / stellar_radius
-                speed = data['ship_speed'][it.index]
+                x_location = sail.telemetry['px'][it.index] * sun_radius / star.R
+                y_location = sail.telemetry['py'][it.index] * sun_radius / star.R
+                speed = sail.telemetry['ship_speed'][it.index]
 
                 # Check if inside the plotted figure (faster plot generation)
                 if abs(x_location) < scale and abs(y_location) < scale:
@@ -454,12 +158,12 @@ def make_figure_flight(
 
                     # Add sail with angle as marker
 
-                    angle = data['sail_angle'][it.index]
+                    angle = sail.telemetry['sail_angle'][it.index]
                     if y_location > 0:
                         angle = -angle
 
                     # Sail is parallel, put it in direction of star:
-                    if not data['sail_not_parallel'][it.index]:
+                    if not sail.telemetry['sail_not_parallel'][it.index]:
                         v1_theta = arctan2(0, 0)
                         v2_theta = arctan2(y_location, x_location)
                         angle = (v2_theta - v1_theta) * (180.0 / pi)
@@ -486,11 +190,11 @@ def make_figure_flight(
                             lw=0.01)
 
                     # To avoid crowding of text labels, set them sparsely
-                    if data['ship_speed'][it.index] > 300:
+                    if sail.telemetry['ship_speed'][it.index] > 300:
                         n_th_print = 1  # print all labels
-                    if 150 < data['ship_speed'][it.index] < 300:
+                    if 150 < sail.telemetry['ship_speed'][it.index] < 300:
                         n_th_print = 3  # print every 5th label
-                    if data['ship_speed'][it.index] < 150:
+                    if sail.telemetry['ship_speed'][it.index] < 150:
                         n_th_print = 5  # print every 5th label
 
                     if -19 < y_location < 19 and (it[0] / 60) % (circle_spacing_minutes * n_th_print) == 0:
@@ -532,9 +236,9 @@ def make_figure_flight(
     return plt
 
 
-def make_figure_speed(data, scale, caption):
+def make_figure_speed(sail, scale, caption):
 
-    encounter_time, step_of_closest_encounter = get_closest_encounter(data)
+    encounter_time, step_of_closest_encounter = sail.get_closest_encounter()
 
     fig = plt.figure(figsize=(6, 6))
     ax = plt.gca()
@@ -554,8 +258,8 @@ def make_figure_speed(data, scale, caption):
     if caption == 'c':
         ax.annotate(r'$\alpha$ Cen C', xy=(2, 12000))
 
-    time = data['time'] / 3600 - encounter_time
-    speed = data['ship_speed']
+    time = sail.telemetry['time'] / 3600 - encounter_time
+    speed = sail.telemetry['ship_speed']
     plt.plot(time, speed, color='black', linewidth=0.5)
 
     # Vertical line
@@ -576,35 +280,23 @@ def make_figure_speed(data, scale, caption):
     return plt
 
 
-def get_closest_encounter(data):
-    closest_encounter = float("inf")
-    step_of_closest_encounter = 0
-    for step in range(len(data['stellar_distance'])):
-        if data['stellar_distance'][step] < closest_encounter:
-            closest_encounter = data['stellar_distance'][step]
-            step_of_closest_encounter = step
-    encounter_time = data['time'][step_of_closest_encounter] / 3600  # hours
-    print('Closest encounter at step', step_of_closest_encounter,
-          'with distance [stellar radii]', '{:1.1f}'.format(closest_encounter),
-          'at time', '{:1.1f}'.format(encounter_time))
-
-    return encounter_time, step_of_closest_encounter
 
 
-def make_figure_forces(data, scale, stellar_radius):
+
+def make_figure_forces(sail, scale, stellar_radius):
 
     # Find closest encounter
-    encounter_time, step_of_closest_encounter = get_closest_encounter(data)
+    encounter_time, step_of_closest_encounter = sail.get_closest_encounter()
 
-    # select data from start to closest encounter
-    px_stellar_units = data['px'] * sun_radius / stellar_radius
-    py_stellar_units = data['py'] * sun_radius / stellar_radius
+    # select sail.telemetry from start to closest encounter
+    px_stellar_units = sail.telemetry['px'] * sun_radius / stellar_radius
+    py_stellar_units = sail.telemetry['py'] * sun_radius / stellar_radius
 
     # distance between sail and origin in [m]
     distance = sqrt((px_stellar_units**2) + (py_stellar_units**2))
     distance[:step_of_closest_encounter] = -distance[:step_of_closest_encounter]
 
-    total_force = data['F_photon'] - data['F_gravity']
+    total_force = sail.telemetry['F_photon'] - sail.telemetry['F_gravity']
     gee = total_force / 0.086 / 9.81
     print('max total_force', numpy.max(total_force))
     print('max gee', numpy.max(gee))
@@ -620,17 +312,17 @@ def make_figure_forces(data, scale, stellar_radius):
     ax.get_xaxis().set_tick_params(which='both', direction='in')
 
     fig.suptitle('a', fontsize=14, fontweight='bold', x=0.131, y=0.95)
-    time = data['time'] / 3600 - encounter_time
-    total_force = data['F_photon'][:step_of_closest_encounter]
-    - data['F_gravity'][:step_of_closest_encounter]
+    time = sail.telemetry['time'] / 3600 - encounter_time
+    total_force = sail.telemetry['F_photon'][:step_of_closest_encounter]
+    - sail.telemetry['F_gravity'][:step_of_closest_encounter]
     ax.plot(distance[:step_of_closest_encounter],
-        data['F_gravity'][:step_of_closest_encounter],
+        sail.telemetry['F_gravity'][:step_of_closest_encounter],
         color='black', linewidth=1.)
     ax.plot(distance[step_of_closest_encounter:],
-        data['F_gravity'][step_of_closest_encounter:],
+        sail.telemetry['F_gravity'][step_of_closest_encounter:],
         color='black', linewidth=1.)
     ax.plot(distance[:step_of_closest_encounter],
-        data['F_photon'][:step_of_closest_encounter],
+        sail.telemetry['F_photon'][:step_of_closest_encounter],
         color='black', linestyle = 'dashed', linewidth=1.)
     offset = 0.02  # to show photon and total lines separatley
     ax.plot(distance[:step_of_closest_encounter],
@@ -678,7 +370,7 @@ def make_figure_forces(data, scale, stellar_radius):
 
     axins.plot(
         distance[:step_of_closest_encounter],
-        data['F_photon'][:step_of_closest_encounter],
+        sail.telemetry['F_photon'][:step_of_closest_encounter],
         color='black',
         linewidth=1,
         linestyle='dashed')
@@ -701,15 +393,15 @@ def make_figure_forces(data, scale, stellar_radius):
     return plt
 
 
-def make_figure_distance_pitch_angle(data, scale, stellar_radius):
+def make_figure_distance_pitch_angle(sail, scale, stellar_radius):
 
-    encounter_time, step_of_closest_encounter = get_closest_encounter(data)
+    encounter_time, step_of_closest_encounter = sail.get_closest_encounter()
 
-    # select data from start to closest encounter
+    # select sail.telemetry from start to closest encounter
     stellar_radii = sun_radius / stellar_radius
-    px_stellar_units = data['px'][:step_of_closest_encounter] * stellar_radii
-    py_stellar_units = data['py'][:step_of_closest_encounter] * stellar_radii
-    pitch_angle = data['alpha'][:step_of_closest_encounter]
+    px_stellar_units = sail.telemetry['px'][:step_of_closest_encounter] * stellar_radii
+    py_stellar_units = sail.telemetry['py'][:step_of_closest_encounter] * stellar_radii
+    pitch_angle = sail.telemetry['alpha'][:step_of_closest_encounter]
     pitch_angle = -numpy.degrees(pitch_angle)
 
     # distance between sail and origin in [m]
@@ -736,15 +428,10 @@ def make_figure_distance_pitch_angle(data, scale, stellar_radius):
     return plt
 
 
-def make_figure_series_of_curves(
-    ship_py,
-    ship_vx,
-    ship_vy,
-    ship_mass,
-    ship_sail_area,
-    M_star,
-    R_star,
-    L_star,
+
+def make_figure_multiple_sails(
+    sailarray,
+    star,
     minimum_distance_from_star,
     afterburner_distance,
     timestep,
@@ -758,83 +445,38 @@ def make_figure_series_of_curves(
     color = 'black'
     redness = 0.7
     star_name = ''
-    weight_ratio = 1 / ship_sail_area
     circle_spacing_minutes = 2e10  # never
     show_burn_circle = True
-    annotate_cases = True
-
-    # Special case, print one extra to show return mission
-    """
-    if return_mission:
-
-        print('Generating special case return mission')
-        horizontal_offset = 2.7 * R_star
-        my_data = fly(horizontal_offset, ship_py, ship_vx, ship_vy, ship_mass,
-            ship_sail_area, M_star, R_star, L_star, minimum_distance_from_star, afterburner_distance, timestep, number_of_steps, return_mission=True)
-        print_flight_report(my_data)
-
-        my_figure = make_figure_flight(my_data, R_star, scale, color,
-            redness, show_burn_circle, star_name, weight_ratio, circle_spacing_minutes, annotate_cases, caption)
-
-        print('Generating special case: bound orbit')
-        horizontal_offset = 2.7 * R_star
-        afterburner_distance_special = 10e10
-        my_data = fly(horizontal_offset, ship_py, ship_vx, ship_vy, ship_mass,
-            ship_sail_area, M_star, R_star, L_star, minimum_distance_from_star, afterburner_distance_special, timestep, number_of_steps, return_mission=False)
-        print_flight_report(my_data)
-
-        my_figure = make_figure_flight(my_data, R_star, scale, color,
-            redness, show_burn_circle, star_name, weight_ratio, circle_spacing_minutes, annotate_cases, caption)
-
-        print('Generating special case: break out to -x, -y')
-        horizontal_offset = 2.7 * R_star
-        afterburner_distance_special = 14
-        my_data = fly(horizontal_offset, ship_py, ship_vx, ship_vy, ship_mass,
-            ship_sail_area, M_star, R_star, L_star, minimum_distance_from_star, afterburner_distance_special, timestep, number_of_steps, return_mission=False)
-        print_flight_report(my_data)
-
-        my_figure = make_figure_flight(my_data, R_star, scale, color,
-            redness, show_burn_circle, star_name, weight_ratio, circle_spacing_minutes, annotate_cases, caption)
-    """
-
+    
     annotate_cases = False  # Avoid printing it many times
-    start = numpy.min(offsets)
-    stop = numpy.max(offsets)
-    iterations = numpy.size(offsets)
+
+    niterations = len(sailarray)
     iter_counter = 0
-    for horizontal_offset in offsets:
+    
+    for ship in sailarray:
+        iter_counter += 1
+        weight_ratio = 1/ship.area
+        
         print(
             'Now running iteration', iter_counter + 1,
-            'of', int(iterations),
-            'with offset', horizontal_offset / R_star)
-        iter_counter += 1
-        my_data = fly(
-            horizontal_offset,
-            ship_py,
-            ship_vx,
-            ship_vy,
-            ship_mass,
-            ship_sail_area,
-            M_star,
-            R_star,
-            L_star,
-            minimum_distance_from_star,
-            afterburner_distance,
-            timestep,
-            number_of_steps,
-            return_mission=False)
-
-        print_flight_report(my_data)
-        color_shade = iter_counter / iterations
+            'of', int(niterations))
+        print ship
+        
+        ship.fly(star,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
+        ship.print_flight_report()
+        
+        color_shade = iter_counter / niterations
+        
         if color_shade > 1:
             color_shade = 1
         if color_shade < 0:
             color_shade = 0
+        
         color = [1 - color_shade, 0, color_shade]
 
         my_figure = make_figure_flight(
-            my_data,
-            R_star,
+            ship,
+            star,
             scale,
             color,
             redness,
@@ -857,8 +499,8 @@ def make_figure_series_of_curves(
 
 
 def make_video_flight(
-        data,
-        stellar_radius,
+        sail,
+        star,
         scale,
         flight_color,
         redness,
@@ -872,8 +514,8 @@ def make_video_flight(
     ax = fig.add_subplot(111, aspect='equal')
 
     # Flight trajectorie
-    px_stellar_units = data['px'] * sun_radius / stellar_radius
-    py_stellar_units = data['py'] * sun_radius / stellar_radius
+    px_stellar_units = sail.telemetry['px'] * st.sun_radius / star.R
+    py_stellar_units = sail.telemetry['py'] * st.sun_radius / star.R
 
     # If desired, show dashed circle for minimum distance
     if show_burn_circle:
@@ -897,18 +539,18 @@ def make_video_flight(
     scalarMap = matplotlib.cm.ScalarMappable(norm=cNorm, cmap='Reds_r')
 
     # Calculate and print deflection angle (and star name) if desired
-    it = numpy.nditer(data['time'], flags=['f_index'])
+    it = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
     while not it.finished:
 
-        x_location = data['px'][it.index] * sun_radius / stellar_radius
-        y_location = data['py'][it.index] * sun_radius / stellar_radius
-        speed = data['ship_speed'][it.index]
-        time = data['time'][it.index]
+        x_location = sail.telemetry['px'][it.index] * star.sun_radius / stellar_radius
+        y_location = sail.telemetry['py'][it.index] * star.sun_radius / stellar_radius
+        speed = sail.telemetry['ship_speed'][it.index]
+        time = sail.telemetry['time'][it.index]
 
         # Check if inside the plotted figure (faster plot generation)
         if abs(x_location) < scale and abs(y_location) < scale + 2:
             if time_start == 0:
-                time_start = data['time'][it.index]
+                time_start = sail.telemetry['time'][it.index]
             plt.cla()
 
             # Colorbar
@@ -917,11 +559,11 @@ def make_video_flight(
                 # Color bar
                 x1 = 15
                 x2 = 20
-                y1 = data['py'][step] * sun_radius / stellar_radius
+                y1 = sail.telemetry['py'][step] * sun_radius / stellar_radius
                 y2 = y1
                 if -20 < y1 < 20:
-                    speed_change = data['ship_speed'][step] - data['ship_speed'][step-1]  # km/sec
-                    time_change = data['time'][step] - data['time'][step-1]  # sec
+                    speed_change = sail.telemetry['ship_speed'][step] - sail.telemetry['ship_speed'][step-1]  # km/sec
+                    time_change = sail.telemetry['time'][step] - sail.telemetry['time'][step-1]  # sec
                     g_force = speed_change / time_change * 1000 / 9.81
                     colorVal = scalarMap.to_rgba(g_force)
                     plt.plot([x1, x2], [y1, y2], color=colorVal, linewidth=4)
@@ -958,7 +600,7 @@ def make_video_flight(
                 plt.gcf().gca().add_artist(Sun)
 
             ax.annotate(star_name, xy=(-2.5, 1.75))
-            deflection_angle = abs(arctan2(data['py'][-1], data['px'][-1]) * (360 / (2 * pi))) - 90
+            deflection_angle = abs(arctan2(sail.telemetry['py'][-1], sail.telemetry['px'][-1]) * (360 / (2 * pi))) - 90
 
             # print angle
             text_deflection_angle = r'$\delta = {:1.0f} ^\circ$'.format(deflection_angle)
@@ -968,11 +610,11 @@ def make_video_flight(
                 fontsize=16)
 
             # Add a circle mark at the closest encounter
-            index_min = numpy.argmin(data['stellar_distance'])
+            index_min = numpy.argmin(sail.telemetry['stellar_distance'])
             if it.index > index_min:  # past the closest encounter
                 stellar_radii = sun_radius / stellar_radius
-                min_x_location = data['px'][index_min] * stellar_radii
-                min_y_location = data['py'][index_min] * stellar_radii
+                min_x_location = sail.telemetry['px'][index_min] * stellar_radii
+                min_y_location = sail.telemetry['py'][index_min] * stellar_radii
                 # print('drawing closest encounter at (x,y)=', min_x_location, min_y_location)
                 marker = plt.Circle(
                     (min_x_location, min_y_location),
@@ -989,7 +631,7 @@ def make_video_flight(
                 fontsize=16)
 
             # print entry speed
-            text_entry_speed = r'$\nu_{{\infty}} = {:10.0f}$ km/s'.format(data['ship_speed'][1])
+            text_entry_speed = r'$\nu_{{\infty}} = {:10.0f}$ km/s'.format(sail.telemetry['ship_speed'][1])
             ax.annotate(
                 text_entry_speed,
                 xy=(-scale + 1, scale - 8),
@@ -1005,12 +647,12 @@ def make_video_flight(
             current_marker_number = current_marker_number + 1
 
             # Show sail angle as line
-            angle = data['sail_angle'][it.index]
+            angle = sail.telemetry['sail_angle'][it.index]
             if y_location > 0:
                 angle = -angle
 
             # Sail is parallel, put it in direction of star:
-            if not data['sail_not_parallel'][it.index]:
+            if not sail.telemetry['sail_not_parallel'][it.index]:
                 v1_theta = arctan2(0, 0)
                 v2_theta = arctan2(y_location, x_location)
                 angle = (v2_theta - v1_theta) * (180.0 / 3.141)
@@ -1027,12 +669,12 @@ def make_video_flight(
             """
             # Add circle marks every [circle_spacing_minutes] and annotate them
             current_marker_number = 0
-            inner_loop = numpy.nditer(data['time'], flags=['f_index'])
+            inner_loop = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
             while not inner_loop.finished and inner_loop.index < it.index:
                 if (inner_loop[0] / 60) % circle_spacing_minutes == 0:
-                    x_location = data['px'][inner_loop.index] * sun_radius / stellar_radius
-                    y_location = data['py'][inner_loop.index] * sun_radius / stellar_radius
-                    speed = data['ship_speed'][inner_loop.index]
+                    x_location = sail.telemetry['px'][inner_loop.index] * sun_radius / stellar_radius
+                    y_location = sail.telemetry['py'][inner_loop.index] * sun_radius / stellar_radius
+                    speed = sail.telemetry['ship_speed'][inner_loop.index]
 
                     # Check if inside the plotted figure (faster plot generation)
                     if abs(x_location) < scale and abs(y_location) < scale:
@@ -1047,11 +689,11 @@ def make_video_flight(
                         current_marker_number = current_marker_number + 1
 
                         # To avoid crowding of text labels, set them sparsely
-                        if data['ship_speed'][inner_loop.index] > 300:
+                        if sail.telemetry['ship_speed'][inner_loop.index] > 300:
                             n_th_print = 1  # print all labels
-                        if 150 < data['ship_speed'][inner_loop.index] < 300:
+                        if 150 < sail.telemetry['ship_speed'][inner_loop.index] < 300:
                             n_th_print = 3  # print every 5th label
-                        if data['ship_speed'][inner_loop.index] < 150:
+                        if sail.telemetry['ship_speed'][inner_loop.index] < 150:
                             n_th_print = 5  # print every 5th label
 
                         if -19 < y_location < 19 and (inner_loop[0] / 60) % (circle_spacing_minutes * n_th_print) == 0:
@@ -1091,8 +733,8 @@ def make_video_flight(
 
 
 def make_video_flight_black(
-        data,
-        stellar_radius,
+        sail,
+        star,
         scale,
         flight_color,
         redness,
@@ -1111,8 +753,8 @@ def make_video_flight_black(
     plt.axis('off')
 
     # Flight trajectorie
-    px_stellar_units = data['px'] * sun_radius / stellar_radius
-    py_stellar_units = data['py'] * sun_radius / stellar_radius
+    px_stellar_units = sail.telemetry['px'] * st.sun_radius / star.R
+    py_stellar_units = sail.telemetry['py'] * st.sun_radius / star.R
 
     # If desired, show dashed circle for minimum distance
     if show_burn_circle:
@@ -1136,7 +778,7 @@ def make_video_flight_black(
     scalarMap = matplotlib.cm.ScalarMappable(norm=cNorm, cmap='Reds_r')
 
     # Calculate and print deflection angle (and star name) if desired
-    it = numpy.nditer(data['time'], flags=['f_index'])
+    it = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
     while not it.finished:
         """
         fig = plt.gcf()
@@ -1148,15 +790,15 @@ def make_video_flight_black(
         plt.axis('off')
         ax.set_axis_off()
         """
-        x_location = data['px'][it.index] * sun_radius / stellar_radius
-        y_location = data['py'][it.index] * sun_radius / stellar_radius
-        speed = data['ship_speed'][it.index]
-        time = data['time'][it.index]
+        x_location = sail.telemetry['px'][it.index] * sun_radius / stellar_radius
+        y_location = sail.telemetry['py'][it.index] * sun_radius / stellar_radius
+        speed = sail.telemetry['ship_speed'][it.index]
+        time = sail.telemetry['time'][it.index]
 
         # Check if inside the plotted figure (faster plot generation)
         if abs(x_location) < scale and abs(y_location) < scale + 2:
             if time_start == 0:
-                time_start = data['time'][it.index]
+                time_start = sail.telemetry['time'][it.index]
             plt.cla()
 
             # Colorbar
@@ -1165,11 +807,11 @@ def make_video_flight_black(
                 # Color bar
                 x1 = 15
                 x2 = 20
-                y1 = data['py'][step] * sun_radius / stellar_radius
+                y1 = sail.telemetry['py'][step] * sun_radius / stellar_radius
                 y2 = y1
                 if -20 < y1 < 20:
-                    speed_change = data['ship_speed'][step] - data['ship_speed'][step-1]  # km/sec
-                    time_change = data['time'][step] - data['time'][step-1]  # sec
+                    speed_change = sail.telemetry['ship_speed'][step] - sail.telemetry['ship_speed'][step-1]  # km/sec
+                    time_change = sail.telemetry['time'][step] - sail.telemetry['time'][step-1]  # sec
                     g_force = speed_change / time_change * 1000 / 9.81
                     colorVal = scalarMap.to_rgba(g_force)
                     plt.plot([x1, x2], [y1, y2], color=colorVal, linewidth=4)
@@ -1206,7 +848,7 @@ def make_video_flight_black(
                 plt.gcf().gca().add_artist(Sun)
 
             ax.annotate(star_name, xy=(-2.5, 1.75))
-            deflection_angle = abs(arctan2(data['py'][-1], data['px'][-1]) * (360 / (2 * pi))) - 90
+            deflection_angle = abs(arctan2(sail.telemetry['py'][-1], sail.telemetry['px'][-1]) * (360 / (2 * pi))) - 90
 
             # print angle
             text_deflection_angle = r'$\delta = {:1.0f} ^\circ$'.format(deflection_angle)
@@ -1217,11 +859,11 @@ def make_video_flight_black(
                 color='white')
 
             # Add a circle mark at the closest encounter
-            index_min = numpy.argmin(data['stellar_distance'])
+            index_min = numpy.argmin(sail.telemetry['stellar_distance'])
             if it.index > index_min:  # past the closest encounter
                 stellar_radii = sun_radius / stellar_radius
-                min_x_location = data['px'][index_min] * stellar_radii
-                min_y_location = data['py'][index_min] * stellar_radii
+                min_x_location = sail.telemetry['px'][index_min] * stellar_radii
+                min_y_location = sail.telemetry['py'][index_min] * stellar_radii
                 # print('drawing closest encounter at (x,y)=', min_x_location, min_y_location)
                 marker = plt.Circle(
                     (min_x_location, min_y_location),
@@ -1239,7 +881,7 @@ def make_video_flight_black(
                 color='white')
 
             # print entry speed
-            text_entry_speed = r'$\nu_{{\infty}} = {:10.0f}$ km/s'.format(data['ship_speed'][1])
+            text_entry_speed = r'$\nu_{{\infty}} = {:10.0f}$ km/s'.format(sail.telemetry['ship_speed'][1])
             ax.annotate(
                 text_entry_speed,
                 xy=(-scale + 1, scale - 8),
@@ -1258,12 +900,12 @@ def make_video_flight_black(
             """
 
             # Show sail angle as line
-            angle = data['alpha'][it.index]
+            angle = sail.telemetry['alpha'][it.index]
             if y_location > 0:
                 angle = -angle
 
             # Sail is parallel, put it in direction of star:
-            if not data['sail_not_parallel'][it.index]:
+            if not sail.telemetry['sail_not_parallel'][it.index]:
                 v1_theta = arctan2(0, 0)
                 v2_theta = arctan2(y_location, x_location)
                 angle = (v2_theta - v1_theta) * (180.0 / 3.141)
@@ -1280,12 +922,12 @@ def make_video_flight_black(
             """
             # Add circle marks every [circle_spacing_minutes] and annotate them
             current_marker_number = 0
-            inner_loop = numpy.nditer(data['time'], flags=['f_index'])
+            inner_loop = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
             while not inner_loop.finished and inner_loop.index < it.index:
                 if (inner_loop[0] / 60) % circle_spacing_minutes == 0:
-                    x_location = data['px'][inner_loop.index] * sun_radius / stellar_radius
-                    y_location = data['py'][inner_loop.index] * sun_radius / stellar_radius
-                    speed = data['ship_speed'][inner_loop.index]
+                    x_location = sail.telemetry['px'][inner_loop.index] * sun_radius / stellar_radius
+                    y_location = sail.telemetry['py'][inner_loop.index] * sun_radius / stellar_radius
+                    speed = sail.telemetry['ship_speed'][inner_loop.index]
 
                     # Check if inside the plotted figure (faster plot generation)
                     if abs(x_location) < scale and abs(y_location) < scale:
@@ -1300,11 +942,11 @@ def make_video_flight_black(
                         current_marker_number = current_marker_number + 1
 
                         # To avoid crowding of text labels, set them sparsely
-                        if data['ship_speed'][inner_loop.index] > 300:
+                        if sail.telemetry['ship_speed'][inner_loop.index] > 300:
                             n_th_print = 1  # print all labels
-                        if 150 < data['ship_speed'][inner_loop.index] < 300:
+                        if 150 < sail.telemetry['ship_speed'][inner_loop.index] < 300:
                             n_th_print = 3  # print every 5th label
-                        if data['ship_speed'][inner_loop.index] < 150:
+                        if sail.telemetry['ship_speed'][inner_loop.index] < 150:
                             n_th_print = 5  # print every 5th label
 
                         if -19 < y_location < 19 and (inner_loop[0] / 60) % (circle_spacing_minutes * n_th_print) == 0:
