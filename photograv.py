@@ -3,10 +3,10 @@ import numpy
 import matplotlib
 from matplotlib import pyplot as plt
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from matplotlib.ticker import ScalarFormatter
+
 from numpy import arctan2, sqrt, pi, sin, cos, radians
 
-import star as st
+import star
 
 from star import sun_radius
 
@@ -33,8 +33,8 @@ def make_figure_flight(
     ax = fig.add_subplot(111, aspect='equal')
 
     # Flight trajectory
-    px_stellar_units = sail.telemetry['px'] * st.sun_radius / star.R
-    py_stellar_units = sail.telemetry['py'] * st.sun_radius / star.R
+    px_stellar_units = sail.telemetry['px'] * sun_radius / star.R
+    py_stellar_units = sail.telemetry['py'] * sun_radius / star.R
     
     plt.plot(
         px_stellar_units,
@@ -55,7 +55,7 @@ def make_figure_flight(
             # Color bar
             x1 = 15
             x2 = 20
-            y1 = sail.telemetry['py'][step] * st.sun_radius / star.R
+            y1 = sail.telemetry['py'][step] * sun_radius / star.R
             y2 = y1
             if -20 < y1 < 20:
                 speed_change = sail.telemetry['ship_speed'][step] - sail.telemetry['ship_speed'][step-1]  # km/sec
@@ -198,7 +198,7 @@ def make_figure_flight(
                         n_th_print = 5  # print every 5th label
 
                     if -19 < y_location < 19 and (it[0] / 60) % (circle_spacing_minutes * n_th_print) == 0:
-                        test_speed = ''
+                        
                         text_speed = r'{:10.0f} km/s'.format(speed)
                         ax.annotate(
                             text_speed,
@@ -283,14 +283,14 @@ def make_figure_speed(sail, scale, caption):
 
 
 
-def make_figure_forces(sail, scale, stellar_radius):
+def make_figure_forces(sail, star,scale):
 
     # Find closest encounter
     encounter_time, step_of_closest_encounter = sail.get_closest_encounter()
 
     # select sail.telemetry from start to closest encounter
-    px_stellar_units = sail.telemetry['px'] * sun_radius / stellar_radius
-    py_stellar_units = sail.telemetry['py'] * sun_radius / stellar_radius
+    px_stellar_units = sail.telemetry['px'] * sun_radius / star.R
+    py_stellar_units = sail.telemetry['py'] * sun_radius / star.R
 
     # distance between sail and origin in [m]
     distance = sqrt((px_stellar_units**2) + (py_stellar_units**2))
@@ -393,12 +393,12 @@ def make_figure_forces(sail, scale, stellar_radius):
     return plt
 
 
-def make_figure_distance_pitch_angle(sail, scale, stellar_radius):
+def make_figure_distance_pitch_angle(sail, scale, star):
 
     encounter_time, step_of_closest_encounter = sail.get_closest_encounter()
 
     # select sail.telemetry from start to closest encounter
-    stellar_radii = sun_radius / stellar_radius
+    stellar_radii = sun_radius / star.R
     px_stellar_units = sail.telemetry['px'][:step_of_closest_encounter] * stellar_radii
     py_stellar_units = sail.telemetry['py'][:step_of_closest_encounter] * stellar_radii
     pitch_angle = sail.telemetry['alpha'][:step_of_closest_encounter]
@@ -435,12 +435,12 @@ def make_figure_multiple_sails(
     minimum_distance_from_star,
     afterburner_distance,
     timestep,
-    number_of_steps,
     return_mission,
-    offsets,
     scale,
     caption,
     colorbar=False):
+    
+    '''Creates a figure with multiple flights, each with a different sail'''
 
     color = 'black'
     redness = 0.7
@@ -458,12 +458,11 @@ def make_figure_multiple_sails(
         weight_ratio = 1/ship.area
         
         print(
-            'Now running iteration', iter_counter + 1,
+            'Now running iteration', iter_counter,
             'of', int(niterations))
-        print ship
         
-        ship.fly(star,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
-        ship.print_flight_report()
+        ship.fly(star,minimum_distance_from_star,afterburner_distance,timestep,return_mission)
+        
         
         color_shade = iter_counter / niterations
         
@@ -476,6 +475,77 @@ def make_figure_multiple_sails(
 
         my_figure = make_figure_flight(
             ship,
+            star,
+            scale,
+            color,
+            redness,
+            show_burn_circle,
+            star_name,
+            weight_ratio,
+            circle_spacing_minutes,
+            annotate_cases,
+            caption='',
+            colorbar=False)
+
+    fig = plt.gcf()
+    ax = fig.add_subplot(111, aspect='equal')
+    ax.annotate('I, II', xy=(-1, 3))
+    ax.annotate('III', xy=(-16, -5))
+    ax.annotate('IV', xy=(6, -18))
+    fig.suptitle('a', fontsize=16, fontweight='bold', weight='heavy', x=0.22, y=0.95)
+
+    return my_figure
+
+def make_figure_multiple_stars(
+    sail,
+    stararray,
+    minimum_distance_from_star,
+    afterburner_distance,
+    timestep,
+    number_of_steps,
+    return_mission,
+    offsets,
+    scale,
+    caption,
+    colorbar=False):
+    
+    '''Creates a figure with multiple flights, each with a different star'''
+
+    color = 'black'
+    redness = 0.7
+    star_name = ''
+    circle_spacing_minutes = 2e10  # never
+    weight_ratio = 1/sail.area
+    show_burn_circle = True
+    
+    annotate_cases = False  # Avoid printing it many times
+
+    niterations = len(stararray)
+    iter_counter = 0
+    
+    for star in stararray:
+        iter_counter += 1
+        
+        
+        print(
+            'Now running iteration', iter_counter + 1,
+            'of', int(niterations))
+        print star
+        
+        sail.fly(star,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
+        sail.print_flight_report()
+        
+        color_shade = iter_counter / niterations
+        
+        if color_shade > 1:
+            color_shade = 1
+        if color_shade < 0:
+            color_shade = 0
+        
+        color = [1 - color_shade, 0, color_shade]
+
+        my_figure = make_figure_flight(
+            sail,
             star,
             scale,
             color,
@@ -514,8 +584,8 @@ def make_video_flight(
     ax = fig.add_subplot(111, aspect='equal')
 
     # Flight trajectorie
-    px_stellar_units = sail.telemetry['px'] * st.sun_radius / star.R
-    py_stellar_units = sail.telemetry['py'] * st.sun_radius / star.R
+    px_stellar_units = sail.telemetry['px'] * sun_radius / star.R
+    py_stellar_units = sail.telemetry['py'] * sun_radius / star.R
 
     # If desired, show dashed circle for minimum distance
     if show_burn_circle:
@@ -542,8 +612,8 @@ def make_video_flight(
     it = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
     while not it.finished:
 
-        x_location = sail.telemetry['px'][it.index] * star.sun_radius / stellar_radius
-        y_location = sail.telemetry['py'][it.index] * star.sun_radius / stellar_radius
+        x_location = sail.telemetry['px'][it.index] * sun_radius / star.R
+        y_location = sail.telemetry['py'][it.index] * sun_radius / star.R
         speed = sail.telemetry['ship_speed'][it.index]
         time = sail.telemetry['time'][it.index]
 
@@ -559,7 +629,7 @@ def make_video_flight(
                 # Color bar
                 x1 = 15
                 x2 = 20
-                y1 = sail.telemetry['py'][step] * sun_radius / stellar_radius
+                y1 = sail.telemetry['py'][step] * sun_radius / star.R
                 y2 = y1
                 if -20 < y1 < 20:
                     speed_change = sail.telemetry['ship_speed'][step] - sail.telemetry['ship_speed'][step-1]  # km/sec
@@ -612,7 +682,7 @@ def make_video_flight(
             # Add a circle mark at the closest encounter
             index_min = numpy.argmin(sail.telemetry['stellar_distance'])
             if it.index > index_min:  # past the closest encounter
-                stellar_radii = sun_radius / stellar_radius
+                stellar_radii = sun_radius / star.R
                 min_x_location = sail.telemetry['px'][index_min] * stellar_radii
                 min_y_location = sail.telemetry['py'][index_min] * stellar_radii
                 # print('drawing closest encounter at (x,y)=', min_x_location, min_y_location)
@@ -672,8 +742,8 @@ def make_video_flight(
             inner_loop = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
             while not inner_loop.finished and inner_loop.index < it.index:
                 if (inner_loop[0] / 60) % circle_spacing_minutes == 0:
-                    x_location = sail.telemetry['px'][inner_loop.index] * sun_radius / stellar_radius
-                    y_location = sail.telemetry['py'][inner_loop.index] * sun_radius / stellar_radius
+                    x_location = sail.telemetry['px'][inner_loop.index] * sun_radius / star.R
+                    y_location = sail.telemetry['py'][inner_loop.index] * sun_radius / star.R
                     speed = sail.telemetry['ship_speed'][inner_loop.index]
 
                     # Check if inside the plotted figure (faster plot generation)
@@ -753,8 +823,8 @@ def make_video_flight_black(
     plt.axis('off')
 
     # Flight trajectorie
-    px_stellar_units = sail.telemetry['px'] * st.sun_radius / star.R
-    py_stellar_units = sail.telemetry['py'] * st.sun_radius / star.R
+    px_stellar_units = sail.telemetry['px'] * sun_radius / star.R
+    py_stellar_units = sail.telemetry['py'] * sun_radius / star.R
 
     # If desired, show dashed circle for minimum distance
     if show_burn_circle:
@@ -790,8 +860,8 @@ def make_video_flight_black(
         plt.axis('off')
         ax.set_axis_off()
         """
-        x_location = sail.telemetry['px'][it.index] * sun_radius / stellar_radius
-        y_location = sail.telemetry['py'][it.index] * sun_radius / stellar_radius
+        x_location = sail.telemetry['px'][it.index] * sun_radius / star.R
+        y_location = sail.telemetry['py'][it.index] * sun_radius / star.R
         speed = sail.telemetry['ship_speed'][it.index]
         time = sail.telemetry['time'][it.index]
 
@@ -807,7 +877,7 @@ def make_video_flight_black(
                 # Color bar
                 x1 = 15
                 x2 = 20
-                y1 = sail.telemetry['py'][step] * sun_radius / stellar_radius
+                y1 = sail.telemetry['py'][step] * sun_radius / star.R
                 y2 = y1
                 if -20 < y1 < 20:
                     speed_change = sail.telemetry['ship_speed'][step] - sail.telemetry['ship_speed'][step-1]  # km/sec
@@ -861,7 +931,7 @@ def make_video_flight_black(
             # Add a circle mark at the closest encounter
             index_min = numpy.argmin(sail.telemetry['stellar_distance'])
             if it.index > index_min:  # past the closest encounter
-                stellar_radii = sun_radius / stellar_radius
+                stellar_radii = sun_radius / star.R
                 min_x_location = sail.telemetry['px'][index_min] * stellar_radii
                 min_y_location = sail.telemetry['py'][index_min] * stellar_radii
                 # print('drawing closest encounter at (x,y)=', min_x_location, min_y_location)
@@ -925,8 +995,8 @@ def make_video_flight_black(
             inner_loop = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
             while not inner_loop.finished and inner_loop.index < it.index:
                 if (inner_loop[0] / 60) % circle_spacing_minutes == 0:
-                    x_location = sail.telemetry['px'][inner_loop.index] * sun_radius / stellar_radius
-                    y_location = sail.telemetry['py'][inner_loop.index] * sun_radius / stellar_radius
+                    x_location = sail.telemetry['px'][inner_loop.index] * sun_radius / star.R
+                    y_location = sail.telemetry['py'][inner_loop.index] * sun_radius / star.R
                     speed = sail.telemetry['ship_speed'][inner_loop.index]
 
                     # Check if inside the plotted figure (faster plot generation)

@@ -65,7 +65,7 @@ class Sail(object):
         self.telemetry[:] = np.NAN
         
     def __str__(self):
-        s= 'Sail: mass %e, area %e, charge %e' % (self.mass, self.area, self.charge)
+        s= 'Sail: mass %e, area %e, charge %e\n' % (self.mass, self.area, self.charge)
         s = s+"Position: "+str(self.position)+"\n"
         s = s+"Velocity: "+str(self.velocity)+"\n"
         s = s+"Sail Normal: "+str(self.sail_normal)+"\n"

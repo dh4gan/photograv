@@ -1,4 +1,4 @@
-from photograv import make_figure_flight
+from photograv import make_figure_flight, make_video_flight
 import vector
 import star
 import sail
@@ -14,7 +14,7 @@ ship_sail_area = 10  # sail surface im square meters.
 ship_mass = .001  # [kg]
 ship_charge = 0.0 # Charge in Coulomb
 
-ship_position = vector.Vector3D(2.8*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
+ship_position = vector.Vector3D(3.2*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
 
 # Create ship object
@@ -77,3 +77,15 @@ my_plot = make_figure_flight(
 
 #fig.savefig("2b.pdf", bbox_inches = 'tight')
 plt.show()
+
+my_plot = make_video_flight(
+    ship,cenA,
+    scale = 20,  # of plot in [stellar radii]
+    flight_color='black',  # color of flight trajectorie line
+    redness = 0.7,  # 1:red star, 0:yellow; quad limb is darkening hard-coded
+    show_burn_circle = False,  # show dashed circle for minimum distance
+    star_name = r'$\alpha$ Cen A',
+    weight_ratio = 0.1,  # to print 0.1g (we have 10m^2 and 1g)
+    circle_spacing_minutes = 120,  # grid of circle marks every N minutes
+    annotate_cases = False,  # I, II, III, IV, V
+    caption = 'b')  # Figure "suptitle")

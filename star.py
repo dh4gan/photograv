@@ -34,7 +34,7 @@ M_star_CenC = sun_mass * 0.123
 class Star(object):
     
     
-    def __init__(self,m,R,L,B,pos,vel):
+    def __init__(self,m,R,L,B,pos,vel,magmom=vector.Vector3D(0.0,0.0,1.0)):
         '''Initialises star with mass, radius, B-field, position, velocity'''
         self.M = m
         self.R = R
@@ -42,12 +42,12 @@ class Star(object):
         self.B1AU = B
         self.position = pos
         self.velocity = vel
-        self.magmoment = vector.Vector3D(0.0,0.0,0.0)
+        self.magmoment = magmom
         
     def __str__(self):
-        s= 'Star: mass %e, radius %e, luminosity %e' % (self.M, self.R, self.L)
-        s = s+"Position: "+str(self.pos)+"\n"
-        s = s+"Position: "+str(self.vel)+"\n"
+        s= 'Star: mass %e, radius %e, luminosity %e\n' % (self.M/sun_mass, self.R/sun_radius, self.L/sun_luminosity)
+        s = s+"Position: "+str(self.position)+"\n"
+        s = s+"Position: "+str(self.velocity)+"\n"
         return s
     
     def get_magnetic_field_dipole(self,position):
