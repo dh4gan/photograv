@@ -47,7 +47,8 @@ class Star(object):
     def __str__(self):
         s= 'Star: mass %e, radius %e, luminosity %e\n' % (self.M/sun_mass, self.R/sun_radius, self.L/sun_luminosity)
         s = s+"Position: "+str(self.position)+"\n"
-        s = s+"Position: "+str(self.velocity)+"\n"
+        s = s+"Velocity: "+str(self.velocity)+"\n"
+        s = s+"Mag Moment: "+str(self.magmoment)+"\n"
         return s
     
     def get_magnetic_field_dipole(self,position):

@@ -172,6 +172,7 @@ class Sail(object):
         
             # Magnetic Force is velocity dependent!
             self.get_magnetic_force(star)
+            
             self.F_tot = self.F_tot.add(self.F_mag)
 
             # Now photon pressure force

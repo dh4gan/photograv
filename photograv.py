@@ -461,10 +461,11 @@ def make_figure_multiple_sails(
             'Now running iteration', iter_counter,
             'of', int(niterations))
         
+        print ship
         ship.fly(star,minimum_distance_from_star,afterburner_distance,timestep,return_mission)
         
         
-        color_shade = iter_counter / niterations
+        color_shade = float(iter_counter) / float(niterations)
         
         if color_shade > 1:
             color_shade = 1
@@ -472,6 +473,7 @@ def make_figure_multiple_sails(
             color_shade = 0
         
         color = [1 - color_shade, 0, color_shade]
+        print color
 
         my_figure = make_figure_flight(
             ship,
@@ -502,9 +504,7 @@ def make_figure_multiple_stars(
     minimum_distance_from_star,
     afterburner_distance,
     timestep,
-    number_of_steps,
     return_mission,
-    offsets,
     scale,
     caption,
     colorbar=False):
@@ -523,19 +523,20 @@ def make_figure_multiple_stars(
     niterations = len(stararray)
     iter_counter = 0
     
-    for star in stararray:
+    for s in stararray:
         iter_counter += 1
         
         
         print(
-            'Now running iteration', iter_counter + 1,
+            'Now running iteration', iter_counter,
             'of', int(niterations))
-        print star
+        print s
         
-        sail.fly(star,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
-        sail.print_flight_report()
-        
-        color_shade = iter_counter / niterations
+        sail.fly(s,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
+        #sail.print_flight_report()
+        encounter_time, step_of_closest_encounter = sail.get_closest_encounter()
+        print encounter_time, step_of_closest_encounter
+        color_shade = float(iter_counter) / float(niterations)
         
         if color_shade > 1:
             color_shade = 1
@@ -546,7 +547,7 @@ def make_figure_multiple_stars(
 
         my_figure = make_figure_flight(
             sail,
-            star,
+            s,
             scale,
             color,
             redness,

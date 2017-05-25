@@ -12,7 +12,7 @@ timestep = 60 * 5  # 0.1 One timestep every 5 minutes
 speed = 1270 # [km/sec], initial speed of spaceship
 ship_sail_area = 10  # sail surface im square meters.
 ship_mass = .001  # [kg]
-ship_charge = 0.0 # Charge in Coulomb
+ship_charge = 1.0e-3 # Charge in Coulomb
 
 ship_position = vector.Vector3D(3.2*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
@@ -25,15 +25,15 @@ star_position = vector.Vector3D(0.0,0.0,0.0)
 star_velocity = vector.Vector3D(0.0,0.0,0.0)
 
 # Create star object
-cenA = star.Star(star.M_star_CenA,star.R_star_CenA,star.L_star_CenA,star.sun_Bfield_1AU,star_position,star_velocity)
+magmomentvector = vector.Vector3D(0.0,0.0,1.0) # unit vector describing the stellar dipole
+magmomentvector.rotateX(0.5)
+cenA = star.Star(star.M_star_CenA,star.R_star_CenA,star.L_star_CenA,star.sun_Bfield_1AU,star_position,star_velocity, magmom = magmomentvector)
         
-cenA.magmom = vector.Vector3D(0.0,0.0,1.0) # unit vector describing the stellar dipole
-#cenA.magmom.rotateX(0.85)
-
-
 afterburner_distance = 10e10  # [R_star]
 minimum_distance_from_star = 5 * star.R_star_CenA  # closest distance to star. Only used to check, not to adjust sim!
 
+print ship
+print cenA
 
 ship.fly(cenA,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
 

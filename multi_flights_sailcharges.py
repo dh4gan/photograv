@@ -4,12 +4,12 @@ import star
 import sail
 from sail import AU
 import matplotlib.pyplot as plt
-from numpy import linspace
+from numpy import logspace
 
 nships = 20
 shiparray = []
 
-charges= linspace(0.0,1.0, num=nships)
+charges= logspace(-5,0.0, num=nships)
 
 # Define sail:
 nsteps = 10000  # Number of timesteps to compute
@@ -20,7 +20,7 @@ ship_sail_area = 10  # sail surface im square meters.
 ship_mass = .001  # [kg]
 ship_charge = 0.0 # Charge in Coulomb
 
-ship_position = vector.Vector3D(2.5*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
+ship_position = vector.Vector3D(3.0*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
 
 # Create array of ships

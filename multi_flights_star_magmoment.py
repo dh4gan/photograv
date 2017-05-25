@@ -4,12 +4,12 @@ import star
 import sail
 from sail import AU
 import matplotlib.pyplot as plt
-from numpy import linspace
+from numpy import linspace,pi
 
 nstars = 20
 stararray = []
 
-rotation_angle = linspace(0.0,1.0, num=nstars)
+rotation_angle = linspace(0.0,0.1, num=nstars)
 
 
 # Define sail:
@@ -19,9 +19,9 @@ timestep = 60 * 5  # 0.1 One timestep every 5 minutes
 speed = 1270 # [km/sec], initial speed of spaceship
 ship_sail_area = 10  # sail surface im square meters.
 ship_mass = .001  # [kg]
-ship_charge = 0.0 # Charge in Coulomb
+ship_charge = 1.0e-3 # Charge in Coulomb
 
-ship_position = vector.Vector3D(2.5*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
+ship_position = vector.Vector3D(3.0*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
 
 # Create sail
@@ -34,9 +34,11 @@ star_velocity = vector.Vector3D(0.0,0.0,0.0)
 # Create star object
 
 for istar in range(nstars):
-    cenA = star.Star(star.M_star_CenA,star.R_star_CenA,star.L_star_CenA,star.sun_Bfield_1AU,star_position,star_velocity)
-    cenA.magmom = vector.Vector3D(0.0,0.0,1.0).rotateX(rotation_angle[istar]) # unit vector describing the stellar dipole
-
+    
+    magmomvector = vector.Vector3D(0.0,0.0,1.0)
+    magmomvector.rotateX(rotation_angle[istar])
+    
+    cenA = star.Star(star.M_star_CenA,star.R_star_CenA,star.L_star_CenA,star.sun_Bfield_1AU,star_position,star_velocity,magmom=magmomvector)
     stararray.append(cenA)
 
 afterburner_distance = 10e10  # [R_star]
