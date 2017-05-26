@@ -499,7 +499,7 @@ def make_figure_multiple_sails(
     return my_figure
 
 def make_figure_multiple_stars(
-    sail,
+    sail1,
     stararray,
     minimum_distance_from_star,
     afterburner_distance,
@@ -515,7 +515,7 @@ def make_figure_multiple_stars(
     redness = 0.7
     star_name = ''
     circle_spacing_minutes = 2e10  # never
-    weight_ratio = 1/sail.area
+    weight_ratio = 1/sail1.area
     show_burn_circle = True
     
     annotate_cases = False  # Avoid printing it many times
@@ -531,6 +531,8 @@ def make_figure_multiple_stars(
             'Now running iteration', iter_counter,
             'of', int(niterations))
         print s
+        sail = sail1.clone()
+        print sail
         
         sail.fly(s,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
         #sail.print_flight_report()

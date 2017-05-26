@@ -26,7 +26,7 @@ star_velocity = vector.Vector3D(0.0,0.0,0.0)
 
 # Create star object
 magmomentvector = vector.Vector3D(0.0,0.0,1.0) # unit vector describing the stellar dipole
-magmomentvector.rotateX(0.5)
+magmomentvector.rotateX(0.6283)
 cenA = star.Star(star.M_star_CenA,star.R_star_CenA,star.L_star_CenA,star.sun_Bfield_1AU,star_position,star_velocity, magmom = magmomentvector)
         
 afterburner_distance = 10e10  # [R_star]

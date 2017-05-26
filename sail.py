@@ -71,6 +71,9 @@ class Sail(object):
         s = s+"Sail Normal: "+str(self.sail_normal)+"\n"
         return s
     
+    def clone(self):
+        
+        return Sail(self.mass,self.area,self.charge,self.position,self.velocity,self.nsteps)
 
     def get_gravity_force(self,star):
         """Return the gravity force due to a star"""
@@ -239,7 +242,7 @@ class Sail(object):
             self.telemetry['sail_angle'][step] = np.arccos(self.sail_normal.dot(self.position.unitVector()))    
             self.telemetry['photon_acceleration'][step] = self.F_photon.mag()/self.mass
             self.telemetry['ship_speed'][step] = self.velocity.mag()/1000.
-            self.telemetry['stellar_distance'][step] = star_distance
+            self.telemetry['stellar_distance'][step] = star_distance/star.R
             self.telemetry['sail_not_parallel'][step] = deceleration_phase
 
         print 'Flight complete'

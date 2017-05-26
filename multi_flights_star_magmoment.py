@@ -9,7 +9,7 @@ from numpy import linspace,pi
 nstars = 20
 stararray = []
 
-rotation_angle = linspace(0.0,0.1, num=nstars)
+rotation_angle = linspace(0.0,pi, num=nstars)
 
 
 # Define sail:
