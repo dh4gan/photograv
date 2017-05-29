@@ -181,9 +181,9 @@ class Sail(object):
             # Now photon pressure force
         
             # Check if we are past closest encounter. If yes, switch sail off
-            previous_distance = self.telemetry['stellar_distance'][step-1]
+            previous_distance = self.telemetry['stellar_distance'][step-1]*star.R
             if step > 2 and star_distance > previous_distance:
-                #if deceleration_phase:print "Past closest approach: disengaging sail"
+                #if deceleration_phase:print "Past closest approach at time ",str(step),str(self.telemetry['time'][step]),": disengaging sail"
                 deceleration_phase = False
 
             # Check if we are past the star and at afterburner distance
