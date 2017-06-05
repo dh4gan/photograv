@@ -34,12 +34,10 @@ star_position = vector.Vector3D(0.0,0.0,0.0)
 star_velocity = vector.Vector3D(0.0,0.0,0.0)
 
 # Create star object
-cenA = star.Star(star.M_star_CenA,star.R_star_CenA,star.L_star_CenA,star.sun_Bfield_1AU,star_position,star_velocity)
+magmomvector = vector.Vector3D(0.0,0.0,1.0)
+magmomvector.rotateX(0.85)
+cenA = star.Star(star.M_star_CenA,star.R_star_CenA,star.L_star_CenA,star.sun_Bfield_1AU,star_position,star_velocity,magmom=magmomvector)
         
-cenA.magmom = vector.Vector3D(0.0,0.0,1.0) # unit vector describing the stellar dipole
-#cenA.magmom.rotateX(0.85)
-
-
 afterburner_distance = 10e10  # [R_star]
 minimum_distance_from_star = 5 * star.R_star_CenA  # closest distance to star. Only used to check, not to adjust sim!
 

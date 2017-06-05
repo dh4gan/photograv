@@ -1,4 +1,4 @@
-from photograv import make_figure_flight, make_video_flight
+from photograv import make_figure_flight, make_figure_flight_xy_xz, make_video_flight
 import vector
 import star
 import sail
@@ -6,16 +6,16 @@ from sail import AU
 import matplotlib.pyplot as plt
 
 # Define sail:
-nsteps = 10000  # Number of timesteps to compute
+nsteps = 9000  # Number of timesteps to compute
 timestep = 60 * 5  # 0.1 One timestep every 5 minutes
 
 speed = 1270 # [km/sec], initial speed of spaceship
 ship_sail_area = 10  # sail surface im square meters.
 ship_mass = .001  # [kg]
-ship_charge = 1.0e-3 # Charge in Coulomb
+ship_charge = 1.0e-6 # Charge in Coulomb
 
-ship_position = vector.Vector3D(3.2*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
-ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
+ship_position = vector.Vector3D(3.2*star.R_star_CenA,10.0*AU,1.0) # start position vertical / distance travelled
+ship_velocity = vector.Vector3D(0.0,-speed*1000,1.0) # unit conversion; sign: fly downwards
 
 # Create ship object
 ship = sail.Sail(ship_mass,ship_sail_area,ship_charge,ship_position,ship_velocity,nsteps)
@@ -41,24 +41,28 @@ print cenA
 
 ship.fly(cenA,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
 
+
+print ship.telemetry['px'][-10:]
+print ship.telemetry['py'][-10:]
+print ship.telemetry['pz'][-10:]
+
 fig1 = plt.figure()
-ax1 = fig1.add_subplot(311)
-ax1.set_xlim(1.1e6,1.2e6)
-ax1.plot(ship.telemetry['time'], ship.telemetry['F_photon_x'], label='Fphoton_x', color='blue')
-ax1.plot(ship.telemetry['time'], ship.telemetry['F_photon_y'], label='Fphoton_y', color = 'green')
-ax1.plot(ship.telemetry['time'], ship.telemetry['F_mag_x'], label='Fmagx', color='blue', linestyle='dashed')
-ax1.plot(ship.telemetry['time'], ship.telemetry['F_mag_y'], label='Fmagy', color = 'green',linestyle='dashed')
+ax1 = fig1.add_subplot(111)
+#ax1.set_xlim(1.1e6,1.2e6)
+ax1.plot(ship.telemetry['time'], ship.telemetry['px'], label='px', color='blue')
+ax1.plot(ship.telemetry['time'], ship.telemetry['py'], label='py', color = 'green')
+ax1.plot(ship.telemetry['time'], ship.telemetry['pz'], label='pz', color='red', linestyle='dashed')
 ax1.legend(loc='upper left')
-ax2 = fig1.add_subplot(312)
-ax2.set_xlim(1.1e6,1.2e6)
+#ax2 = fig1.add_subplot(312)
+#ax2.set_xlim(1.1e6,1.2e6)
 #ax2.plot(ship.telemetry['time'], ship.telemetry['sail_x'], label='nx', color='black')
-ax2.plot(ship.telemetry['time'],ship.telemetry['ship_speed'], label='speed', color='black')
-ax2.legend(loc='lower left')
-ax3 = fig1.add_subplot(313)
-ax3.set_xlim(1.1e6,1.2e6)
-ax3.plot(ship.telemetry['time'],ship.telemetry['sail_angle'], label = 'alpha', color='red')
-ax3.legend(loc='upper left')
-ax3.set_xlabel('Time')
+#ax2.plot(ship.telemetry['time'],ship.telemetry['ship_speed'], label='speed', color='black')
+#ax2.legend(loc='lower left')
+#ax3 = fig1.add_subplot(313)
+#ax3.set_xlim(1.1e6,1.2e6)
+#ax3.plot(ship.telemetry['time'],ship.telemetry['sail_angle'], label = 'alpha', color='red')
+#ax3.legend(loc='upper left')
+#ax3.set_xlabel('Time')
 plt.show()
 
 
@@ -66,7 +70,7 @@ plt.show()
 # Make figure
 fig = plt.gcf()
 
-my_plot = make_figure_flight(
+my_plot = make_figure_flight_xy_xz(
     ship,cenA,
     scale = 20,  # of plot in [stellar radii]
     flight_color='black',  # color of flight trajectorie line
