@@ -49,6 +49,7 @@ class Sail(object):
                                ('F_gravity', 'f8'),
                                ('F_photon', 'f8'),
                                ('F_magnetic', 'f8'),
+                               ('F_total', 'f8'),
                                ('F_photon_x','f8'),
                                ('F_photon_y','f8'),
                                ('F_photon_z','f8'),
@@ -58,6 +59,9 @@ class Sail(object):
                                ('F_grav_x','f8'),
                                ('F_grav_y','f8'),
                                ('F_grav_z','f8'),
+                               ('F_tot_x','f8'),
+                               ('F_tot_y','f8'),
+                               ('F_tot_z','f8'),
                                ('photon_acceleration', 'f8'),
                                ('ship_speed', 'f8'),
                                ('stellar_distance', 'f8'),
@@ -230,12 +234,16 @@ class Sail(object):
             self.telemetry['F_gravity'][step] = self.F_grav.mag()
             self.telemetry['F_photon'][step] = self.F_photon.mag()
             self.telemetry['F_magnetic'][step] = self.F_mag.mag()
+            self.telemetry['F_total'][step] = self.F_tot.mag()
             self.telemetry['F_photon_x'][step] = self.F_photon.x
             self.telemetry['F_photon_y'][step] = self.F_photon.y
             self.telemetry['F_photon_z'][step] = self.F_photon.z
             self.telemetry['F_mag_x'][step] = self.F_mag.x
             self.telemetry['F_mag_y'][step] = self.F_mag.y
             self.telemetry['F_mag_z'][step] = self.F_mag.z
+            self.telemetry['F_tot_x'][step] = self.F_tot.x
+            self.telemetry['F_tot_y'][step] = self.F_tot.y
+            self.telemetry['F_tot_z'][step] = self.F_tot.z
             self.telemetry['sail_x'][step] = self.sail_normal.x
             self.telemetry['sail_y'][step] = self.sail_normal.y
             self.telemetry['sail_z'][step] = self.sail_normal.z
@@ -309,6 +317,27 @@ class Sail(object):
           'at time', '{:1.1f}'.format(encounter_time))
 
         return encounter_time, step_of_closest_encounter
+    
+    def get_maximum_total_force(self):
+        '''Find the time of maximum force on the sail'''
+        
+        step_of_maxforce = 0     
+        maxforce = 0.0
+     
+        for step in range(self.nsteps):
+            if abs(self.telemetry['F_total'][step] > maxforce):
+                maxforce = self.telemetry['F_total'][step]
+                step_of_maxforce = step
+        
+        force_time = self.telemetry['time'][step_of_maxforce] / 3600  # hours
+        
+        print('Maximum force at step', step_of_maxforce,
+          'with magnitude [N]', '{:1.1f}'.format(maxforce),
+          'at time', '{:1.1f}'.format(force_time))
+
+        return force_time, step_of_maxforce
+        
+        
     
 
     
