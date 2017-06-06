@@ -2,7 +2,7 @@
 # Carries out a large number of flights,
 # Varying sail and stellar parameters slightly
 
-from photograv import make_figure_flight
+
 import vector
 import star
 import sail
@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from numpy import pi
 from numpy.random import rand
 
-nships = 5
+nships = 20
 shiparray = []
 
 # Define distributions for each parameter
@@ -25,9 +25,10 @@ B_thetamax = 5*pi/180.0
 B_phimin = -5*pi/180.0
 B_phimax = 5*pi/180.0
 
-#chargemin = -1.0e-3
-chargemin = 0.0
-chargemax = 1.0e-3
+chargemin = -1.0e-3
+chargemax = 0.0
+#chargemin = 0.0
+#chargemax = 1.0e-3
 
 Lmin = 0.999*star.L_star_CenA
 Lmax = 1.001*star.L_star_CenA
@@ -55,13 +56,26 @@ line = str(nships) + ' \n'
 f_obj.write(line)
 
 
+closest_approach = []
+maxforcemag = []
+
+x_final = []
+y_final = []
+z_final = []
+
+vx_final = []
+vy_final = []
+vz_final = []
+vmag = []
+
 # Loop over total number of flights
 
 for iship in range(nships):
 
     # Define sail
 
-    ship_charge = chargemin + rand()*(chargemax-chargemin)
+    #ship_charge = chargemin + rand()*(chargemax-chargemin)
+    ship_charge = 0.0
     x = xmin + rand()*(xmax-xmin)
 
     ship_position = vector.Vector3D(x,10.0*AU,0.0) # start position vertical / distance travelled
@@ -108,19 +122,23 @@ for iship in range(nships):
     y_init = ship.telemetry['py'][0]
     z_init = ship.telemetry['pz'][0]
     
-    x_final = ship.telemetry['px'][-1]
-    y_final = ship.telemetry['py'][-1]
-    z_final = ship.telemetry['pz'][-1]
+    x_final.append(ship.telemetry['px'][-1])
+    y_final.append(ship.telemetry['py'][-1])
+    z_final.append(ship.telemetry['pz'][-1])
     
-    vx_final = ship.telemetry['vx'][-1]
-    vy_final = ship.telemetry['vy'][-1]
-    vz_final = ship.telemetry['vz'][-1]
+    vmag.append(ship.telemetry['ship_speed'][-1])
+    
+    vx_final.append(ship.telemetry['vx'][-1]/vmag[-1])
+    vy_final.append(ship.telemetry['vy'][-1]/vmag[-1])
+    vz_final.append(ship.telemetry['vz'][-1]/vmag[-1])
+    
+
     
     encounter_time, close_step = ship.get_closest_encounter()
-    closest_approach = ship.telemetry['stellar_distance'][close_step]
+    closest_approach.append(ship.telemetry['stellar_distance'][close_step])
     
     maxforce_time, maxforce_step = ship.get_maximum_total_force()
-    maxforcemag = ship.telemetry['F_total'][maxforce_step]
+    maxforcemag.append(ship.telemetry['F_total'][maxforce_step])
     maxforce_x = ship.telemetry['F_tot_x'][maxforce_step]
     maxforce_y = ship.telemetry['F_tot_y'][maxforce_step]
     maxforce_z = ship.telemetry['F_tot_z'][maxforce_step]
@@ -151,7 +169,12 @@ for iship in range(nships):
     
 f_obj.close()
     
-    
-    
+
+fig1 = plt.figure()
+ax1 = fig1.add_subplot(111)
+ax1.scatter(x_final,y_final)
+
+ax1.quiver(x_final,y_final,vx_final,vy_final)
+plt.show()
     
 
