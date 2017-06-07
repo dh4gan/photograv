@@ -6,6 +6,7 @@ import numpy as np
 from scipy import optimize
 import star
 from star import sun_radius
+import linecache
 
 G = 6.67428e-11  # the gravitational constant G
 c = 299792458  # [m/sec] speed of light
@@ -69,7 +70,7 @@ class Sail(object):
         self.telemetry[:] = np.NAN
         
     def __str__(self):
-        s= 'Sail: mass %e, area %e, charge %e\n' % (self.mass, self.area, self.charge)
+        s= 'Sail: mass %e area %e charge %e\n' % (self.mass, self.area, self.charge)
         s = s+"Position: "+str(self.position)+"\n"
         s = s+"Velocity: "+str(self.velocity)+"\n"
         s = s+"Sail Normal: "+str(self.sail_normal)+"\n"
@@ -351,5 +352,25 @@ class Sail(object):
         headerstring = headerstring + '-------- \n'
         
         np.savetxt(filename, self.telemetry, header = headerstring)
+        
+    def read_from_telemetry_file(self,filename):
+        
+        # Read header and find sail parameters(mass,area, charge)
+        line = linecache.getline(filename, 7)
+        header = line.split()
+        print header
+        self.mass = float(header[3])
+        self.area = float(header[5])
+        self.charge = float(header[7])
+        
+        # Read telemetry data and add to sail 
+        data = np.genfromtxt(filename,skiprows=15)
+        
+        self.nsteps = len(data[:,0])
+        
+        
+        self.telemetry['step'] = data[:,0]
+        print data[:,0]
+        
 
     

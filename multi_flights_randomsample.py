@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 from numpy import pi
 from numpy.random import rand
 
-nships = 20
+nships = 5
 shiparray = []
 
 # Define distributions for each parameter
@@ -37,8 +37,8 @@ xmin = 2.5*star.R_star_CenA
 xmax = 3.5*star.R_star_CenA
 
 # Define fixed sail parameters :
-nsteps = 10000  # Number of timesteps to compute
-timestep = 60 * 5  # 0.1 One timestep every 5 minutes
+nsteps = 5000  # Number of timesteps to compute
+timestep = 60 * 10  # 0.1 One timestep every 5 minutes
 
 speed = 1270 # [km/sec], initial speed of spaceship
 ship_sail_area = 10  # sail surface im square meters.
@@ -86,7 +86,7 @@ for iship in range(nships):
     print "q: ",str(ship_charge)
     
     ship = sail.Sail(ship_mass,ship_sail_area,ship_charge,ship_position,ship_velocity,nsteps)
-
+    shiparray.append(ship)
 
     # Now define star
     star_position = vector.Vector3D(0.0,0.0,0.0)
@@ -115,7 +115,8 @@ for iship in range(nships):
     print cenA
 
     ship.fly(cenA,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
-
+    filename = 'flight_'+str(iship+1)+'.telemetry'
+    ship.write_telemetry_to_file(filename, cenA)
     # Extract data of interest from telemetry
 
     x_init = ship.telemetry['px'][0]
@@ -163,7 +164,6 @@ for iship in range(nships):
     line = line + ' ' +str(closest_approach)+ ' '+str(x_final) + ' '+str(y_final)+' '+str(z_final)+ ' ' +str(vx_final) + ' '+str(vy_final)+' '+str(vz_final)
     line = line + ' '+str(maxforcemag) + ' '+str(maxforce_x)+ ' '+str(maxforce_y)+' '+str(maxforce_z) +' \n'
     
-    print line
     
     f_obj.write(line)
     
@@ -172,7 +172,8 @@ f_obj.close()
 
 fig1 = plt.figure()
 ax1 = fig1.add_subplot(111)
-ax1.scatter(x_final,y_final)
+for iship in range(nships):
+    ax1.plot(shiparray[iship].telemetry['px'], shiparray[iship].telemetry['py'])
 
 ax1.quiver(x_final,y_final,vx_final,vy_final)
 plt.show()
