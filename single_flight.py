@@ -40,7 +40,7 @@ print ship
 print cenA
 
 ship.fly(cenA,minimum_distance_from_star,afterburner_distance,timestep,return_mission =False)
-
+ship.write_telemetry_to_file('test.telemetry',cenA)
 
 print ship.telemetry['px'][-10:]
 print ship.telemetry['py'][-10:]

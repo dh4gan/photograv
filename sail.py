@@ -235,6 +235,9 @@ class Sail(object):
             self.telemetry['F_photon'][step] = self.F_photon.mag()
             self.telemetry['F_magnetic'][step] = self.F_mag.mag()
             self.telemetry['F_total'][step] = self.F_tot.mag()
+            self.telemetry['F_grav_x'][step] = self.F_grav.x
+            self.telemetry['F_grav_y'][step] = self.F_grav.y
+            self.telemetry['F_grav_z'][step] = self.F_grav.z
             self.telemetry['F_photon_x'][step] = self.F_photon.x
             self.telemetry['F_photon_y'][step] = self.F_photon.y
             self.telemetry['F_photon_z'][step] = self.F_photon.z
@@ -338,6 +341,15 @@ class Sail(object):
         return force_time, step_of_maxforce
         
         
-    
+    def write_telemetry_to_file(self,filename,star):
+        
+        headerstring = 'Recorded telemetry for flight around: \n'
+        headerstring = headerstring + str(star)+ '\n'
+        headerstring = headerstring + str(self) + '\n'
+        headerstring = headerstring + '-------- \n'
+        headerstring = headerstring + 'Columns:   step  time  x y z  vx vy vz  F_grav  F_photon  F_mag   F_total  F_grav(x,y,z)  F_photon(x,y,z)  F_magnetic(x,y,z)  sail(x,y,z) sailangle photonacceleration  stellar distance  sail parallel?  \n '
+        headerstring = headerstring + '-------- \n'
+        
+        np.savetxt(filename, self.telemetry, header = headerstring)
 
     
