@@ -36,7 +36,7 @@ class Sail(object):
         
         self.telemetry = np.zeros((self.nsteps,), dtype=[
                                ('step', 'int32'),
-                               ('time', 'int32'),
+                               ('time', 'f8'),
                                ('px', 'f8'),
                                ('py', 'f8'),
                                ('pz', 'f8'),

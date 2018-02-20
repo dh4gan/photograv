@@ -3,14 +3,12 @@ import vector
 import star
 import sail
 from sail import AU
-import matplotlib.pyplot as plt
 from numpy import linspace
 
 nships = 20
 shiparray = []
 
 xoffsets = linspace(0.0,5.0*star.R_star_CenA, num=nships)
-
 
 # Define sail:
 nsteps = 10000  # Number of timesteps to compute
@@ -19,9 +17,9 @@ timestep = 60 * 5  # 0.1 One timestep every 5 minutes
 speed = 1270 # [km/sec], initial speed of spaceship
 ship_sail_area = 10  # sail surface im square meters.
 ship_mass = .001  # [kg]
-ship_charge = 0.0 # Charge in Coulomb
+ship_charge = 1.0e-4 # Charge in Coulomb
 
-ship_position = vector.Vector3D(2.5*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
+ship_position = vector.Vector3D(2.6*star.R_star_CenA,10.0*AU,0.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,0.0) # unit conversion; sign: fly downwards
 
 # Create array of ships
@@ -37,7 +35,7 @@ star_velocity = vector.Vector3D(0.0,0.0,0.0)
 
 # Create star object
 magmomvector = vector.Vector3D(0.0,0.0,1.0)
-magmomvector.rotateX(0.85)
+#magmomvector.rotateX(0.85)
 cenA = star.Star(star.M_star_CenA,star.R_star_CenA,star.L_star_CenA,star.sun_Bfield_1AU,star_position,star_velocity,magmom=magmomvector)
 
 

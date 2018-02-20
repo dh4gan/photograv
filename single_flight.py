@@ -12,9 +12,9 @@ timestep = 60 * 5  # 0.1 One timestep every 5 minutes
 speed = 1270 # [km/sec], initial speed of spaceship
 ship_sail_area = 10  # sail surface im square meters.
 ship_mass = .001  # [kg]
-ship_charge = 1.0e-6 # Charge in Coulomb
+ship_charge = -4.5e-4 # Charge in Coulomb
 
-ship_position = vector.Vector3D(3.2*star.R_star_CenA,10.0*AU,1.0) # start position vertical / distance travelled
+ship_position = vector.Vector3D(3.0*star.R_star_CenA,10.0*AU,1.0) # start position vertical / distance travelled
 ship_velocity = vector.Vector3D(0.0,-speed*1000,1.0) # unit conversion; sign: fly downwards
 
 # Create ship object
@@ -51,8 +51,8 @@ ship.read_from_telemetry_file('test.telemetry')
 fig1 = plt.figure()
 ax1 = fig1.add_subplot(111)
 #ax1.set_xlim(1.1e6,1.2e6)
-ax1.plot(ship.telemetry['time'], ship.telemetry['px'], label='px', color='blue')
-ax1.plot(ship.telemetry['time'], ship.telemetry['py'], label='py', color = 'green')
+#ax1.plot(ship.telemetry['time'], ship.telemetry['px'], label='px', color='blue')
+#ax1.plot(ship.telemetry['time'], ship.telemetry['py'], label='py', color = 'green')
 ax1.plot(ship.telemetry['time'], ship.telemetry['pz'], label='pz', color='red', linestyle='dashed')
 ax1.legend(loc='upper left')
 #ax2 = fig1.add_subplot(312)
@@ -72,7 +72,7 @@ plt.show()
 # Make figure
 fig = plt.gcf()
 
-my_plot = make_figure_flight_xy_xz(
+my_plot = make_figure_flight(
     ship,cenA,
     scale = 20,  # of plot in [stellar radii]
     flight_color='black',  # color of flight trajectorie line
@@ -80,7 +80,7 @@ my_plot = make_figure_flight_xy_xz(
     show_burn_circle = False,  # show dashed circle for minimum distance
     star_name = r'$\alpha$ Cen A',
     weight_ratio = 0.1,  # to print 0.1g (we have 10m^2 and 1g)
-    circle_spacing_minutes = 120,  # grid of circle marks every N minutes
+    circle_spacing_minutes = 1.0e10,  # grid of circle marks every N minutes
     annotate_cases = False,  # I, II, III, IV, V
     caption = 'b')  # Figure "suptitle"
 
@@ -97,4 +97,4 @@ my_plot = make_video_flight(
     weight_ratio = 0.1,  # to print 0.1g (we have 10m^2 and 1g)
     circle_spacing_minutes = 120,  # grid of circle marks every N minutes
     annotate_cases = False,  # I, II, III, IV, V
-    caption = 'b')  # Figure "suptitle")
+    caption = None)  # Figure "suptitle")

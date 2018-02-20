@@ -8,10 +8,10 @@ import star
 import sail
 from sail import AU
 import matplotlib.pyplot as plt
-from numpy import pi
+from numpy import pi, arange, logical_not, isnan
 from numpy.random import rand
 
-nships = 5
+nships = 30
 shiparray = []
 
 # Define distributions for each parameter
@@ -25,10 +25,10 @@ B_thetamax = 5*pi/180.0
 B_phimin = -5*pi/180.0
 B_phimax = 5*pi/180.0
 
-chargemin = -1.0e-3
-chargemax = 0.0
-#chargemin = 0.0
-#chargemax = 1.0e-3
+#chargemin = -1.0e-3
+#chargemax = 0.0
+chargemin = 0.0
+chargemax = 1.0e-3
 
 Lmin = 0.999*star.L_star_CenA
 Lmax = 1.001*star.L_star_CenA
@@ -37,7 +37,7 @@ xmin = 2.5*star.R_star_CenA
 xmax = 3.5*star.R_star_CenA
 
 # Define fixed sail parameters :
-nsteps = 5000  # Number of timesteps to compute
+nsteps = 3000  # Number of timesteps to compute
 timestep = 60 * 10  # 0.1 One timestep every 5 minutes
 
 speed = 1270 # [km/sec], initial speed of spaceship
@@ -74,8 +74,8 @@ for iship in range(nships):
 
     # Define sail
 
-    #ship_charge = chargemin + rand()*(chargemax-chargemin)
-    ship_charge = 0.0
+    ship_charge = chargemin + rand()*(chargemax-chargemin)
+    #ship_charge = 0.0
     x = xmin + rand()*(xmax-xmin)
 
     ship_position = vector.Vector3D(x,10.0*AU,0.0) # start position vertical / distance travelled
@@ -160,22 +160,47 @@ for iship in range(nships):
 #     plt.show()
 #     
     # Record basic output data
-    line = str(ship_charge)+ ' '+str(x_init)+ ' '+str(Lstar/star.L_star_CenA) + ' '+ str(B1AU)+ ' '+str(B_theta)+' '+str(B_phi)
-    line = line + ' ' +str(closest_approach)+ ' '+str(x_final) + ' '+str(y_final)+' '+str(z_final)+ ' ' +str(vx_final) + ' '+str(vy_final)+' '+str(vz_final)
-    line = line + ' '+str(maxforcemag) + ' '+str(maxforce_x)+ ' '+str(maxforce_y)+' '+str(maxforce_z) +' \n'
+#    line = str(ship_charge)+ ' '+str(x_init)+ ' '+str(Lstar/star.L_star_CenA) + ' '+ str(B1AU)+ ' '+str(B_theta)+' '+str(B_phi)
+#    line = line + ' ' +str(closest_approach)+ ' '+str(x_final) + ' '+str(y_final)+' '+str(z_final)+ ' ' +str(vx_final) + ' '+str(vy_final)+' '+str(vz_final)
+#    line = line + ' '+str(maxforcemag) + ' '+str(maxforce_x)+ ' '+str(maxforce_y)+' '+str(maxforce_z) +' \n'
     
     
     f_obj.write(line)
     
 f_obj.close()
-    
+   
+scale = 20 
 
 fig1 = plt.figure()
 ax1 = fig1.add_subplot(111)
-for iship in range(nships):
-    ax1.plot(shiparray[iship].telemetry['px'], shiparray[iship].telemetry['py'])
+plt.rc('font', family='serif')
+minor_ticks = arange(-20,20, 1)
+ax1.set_xticks(minor_ticks, minor=True)
+ax1.set_yticks(minor_ticks, minor=True)
+ax1.set_xlim(-scale, scale)
+ax1.set_ylim(-scale, scale)
+ax1.set_xlabel('Distance [Stellar Radii]', fontweight='bold')
+ax1.set_ylabel('Distance [Stellar Radii]', fontweight='bold')
 
-ax1.quiver(x_final,y_final,vx_final,vy_final)
+for iship in range(nships):
+    ax1.plot(shiparray[iship].telemetry['px'], shiparray[iship].telemetry['py'], color='black')
+
+ax1.quiver(x_final,y_final,vx_final,vy_final, alpha=0.3, color='red')
+ax1.set_xlim(-20,20)
+ax1.set_ylim(-20,20)
+
+
+print z_final
+
+#z_final = z_final[logical_not(isnan(z_final))]
+
+fig2 = plt.figure()
+ax2 = fig2.add_subplot(111)
+ax2.hist(z_final)
+ax2.set_xlabel('Z Offset [Stellar Radii]', fontweight='bold')
 plt.show()
+
+fig1.savefig('random_trajectories.png')
+fig2.savefig('random_zoffsets.png')
     
 

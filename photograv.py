@@ -28,7 +28,8 @@ def make_figure_flight(
         circle_spacing_minutes,
         annotate_cases,
         caption,
-        colorbar=True):
+        colorbar=True,
+        dashed=False):
     
     fig = plt.gcf()
     ax = fig.add_subplot(111, aspect='equal')
@@ -37,11 +38,18 @@ def make_figure_flight(
     px_stellar_units = sail.telemetry['px'] * sun_radius / star.R
     py_stellar_units = sail.telemetry['py'] * sun_radius / star.R
     
-    plt.plot(
-        px_stellar_units,
-        py_stellar_units,
-        color=flight_color,
-        linewidth=0.5)
+    if(dashed):
+        plt.plot(
+                 px_stellar_units,
+                 py_stellar_units,
+                 color=flight_color,
+                 linewidth=1.0, linestyle = 'dotted')
+    else:
+        plt.plot(
+                 px_stellar_units,
+                 py_stellar_units,
+                 color=flight_color,
+                 linewidth=0.5)
 
     # G-Forces
 
@@ -266,171 +274,6 @@ def make_figure_flight_3D(
         pz_stellar_units,
         color=flight_color,
         linewidth=0.5)
-
-#     # G-Forces
-# 
-#     cNorm = matplotlib.colors.Normalize(vmin=-11.5, vmax=2)
-#     scalarMap = matplotlib.cm.ScalarMappable(norm=cNorm, cmap='Reds_r')
-# 
-#     last_label = 18.5
-# 
-#     if colorbar:
-# 
-#         for step in range(sail.nsteps):
-#             # Color bar
-#             x1 = 15
-#             x2 = 20
-#             y1 = sail.telemetry['py'][step] * sun_radius / star.R
-#             y2 = y1
-#             if -20 < y1 < 20:
-#                 speed_change = sail.telemetry['ship_speed'][step] - sail.telemetry['ship_speed'][step-1]  # km/sec
-#                 time_change = sail.telemetry['time'][step] - sail.telemetry['time'][step-1]  # sec
-#                 g_force = speed_change / time_change * 1000 / 9.81
-#                 colorVal = scalarMap.to_rgba(g_force)
-#                 plt.plot([x1, x2], [y1, y2], color = colorVal, linewidth = 4.)
-#             if y1 < last_label + 1 and y1 < 18 and y1 > -18:
-#                 if g_force < -10:
-#                     textcolor = 'white'
-#                 else:
-#                     textcolor = 'black'
-#                 text = r'${:2.1f} g$'.format(g_force)
-#                 plt.annotate(
-#                     text, xy=(17, y1),
-#                     fontsize=12,
-#                     horizontalalignment='center',
-#                     color=textcolor)
-# 
-#                 last_label = last_label - 4
-# 
-#     # If desired, show dashed circle for minimum distance
-#     if show_burn_circle:
-#         circle2 = plt.Circle(
-#             (0, 0),
-#             5,
-#             color='black',
-#             fill=False,
-#             linestyle='dashed',
-#             linewidth=0.5)  # dashed version
-#         # shaded version
-#         # circle2=plt.Circle((0,0), 5, color=(0.9, 0.9, 0.9), fill=True)
-# 
-#         fig.gca().add_artist(circle2)
-        
-
-#     # Star in the center with limb darkening
-#     star_quality = 50  # number of shades
-#     limb1 = 0.4703  # quadratic limb darkening parameters
-#     limb2 = 0.236
-#     for i in range(star_quality):
-#         impact = i / float(star_quality)
-#         LimbDarkening = quadratic_limb_darkening(impact, limb1, limb2)
-#         Sun = plt.Circle(
-#             (0, 0),
-#             1 - i / float(star_quality),
-#             color=(LimbDarkening, redness * LimbDarkening, 0))
-#         plt.gcf().gca().add_artist(Sun)
-# 
-#     # Calculate and print deflection angle (and star name) if desired
-#     if star_name != '':
-#         ax.annotate(star_name, xy=(-2.5, 1.75))
-#         deflection_angle = abs(
-#             arctan2(sail.telemetry['py'][-1], sail.telemetry['px'][-1]) * (360 / (2 * pi))) - 90
-# 
-#         # print angle
-#         text_deflection_angle = r'$\delta = {:1.0f} ^\circ$'.format(deflection_angle)
-# 
-#         ax.annotate(
-#             text_deflection_angle,
-#             xy=(-scale + 1, scale - 2.5),
-#             fontsize=16)
-# 
-#         # Add a circle mark at the closest encounter
-#         index_min = numpy.argmin(sail.telemetry['stellar_distance'])
-#         min_x_location = sail.telemetry['px'][index_min] * sun_radius / star.R
-#         min_y_location = sail.telemetry['py'][index_min] * sun_radius / star.R
-#         marker = plt.Circle(
-#             (min_x_location, min_y_location), 0.2, color='red', fill=False)
-#         plt.gcf().gca().add_artist(marker)
-# 
-#         # print weight ratio
-#         text_weight_ratio = r'$\sigma = {:1.1f}$ g/m$^2$'.format(weight_ratio)
-#         ax.annotate(text_weight_ratio, xy=(-scale + 1, scale - 5), fontsize=16)
-# 
-#         # print entry speed
-#         text_entry_speed = r'$\nu_{{\infty}} = {:10.0f}$ km/s'.format(sail.telemetry['ship_speed'][1])
-#         ax.annotate(text_entry_speed, xy=(-scale + 1, scale - 8), fontsize=16)
-# 
-#         # Add circle marks every [circle_spacing_minutes] and annotate them
-#         current_marker_number = 0
-#         it = numpy.nditer(sail.telemetry['time'], flags=['f_index'])
-#         while not it.finished:
-#             if (it[0] / 60) % circle_spacing_minutes == 0:
-#                 x_location = sail.telemetry['px'][it.index] * sun_radius / star.R
-#                 y_location = sail.telemetry['py'][it.index] * sun_radius / star.R
-#                 speed = sail.telemetry['ship_speed'][it.index]
-# 
-#                 # Check if inside the plotted figure (faster plot generation)
-#                 if abs(x_location) < scale and abs(y_location) < scale:
-# 
-#                     # Yes, mark it
-#                     marker = plt.Circle(
-#                         (x_location, y_location),
-#                         0.1,
-#                         color='black',
-#                         fill=True)
-#                     plt.gcf().gca().add_artist(marker)
-#                     current_marker_number = current_marker_number + 1
-# 
-#                     # Add sail with angle as marker
-# 
-#                     angle = sail.telemetry['sail_angle'][it.index]
-#                     if y_location > 0:
-#                         angle = -angle
-# 
-#                     # Sail is parallel, put it in direction of star:
-#                     if not sail.telemetry['sail_not_parallel'][it.index]:
-#                         v1_theta = arctan2(0, 0)
-#                         v2_theta = arctan2(y_location, x_location)
-#                         angle = (v2_theta - v1_theta) * (180.0 / pi)
-#                         angle = radians(angle)
-# 
-#                     # Calculate start and end positions of sail line
-#                     length = 1
-#                     endy = y_location + (length * sin(angle))
-#                     endx = x_location + (length * cos(angle))
-#                     starty = y_location - (length * sin(angle))
-#                     startx = x_location - (length * cos(angle))
-#                     plt.plot([startx, endx], [starty, endy], color='black')
-# 
-#                     # Make arrow between first and second circle mark
-#                     if current_marker_number == 1:
-#                         ax.arrow(
-#                             x_location,
-#                             y_location - 2, 0.0,
-#                             -0.01,
-#                             head_width=0.75,
-#                             head_length=0.75,
-#                             fc='k',
-#                             ec='k',
-#                             lw=0.01)
-# 
-#                     # To avoid crowding of text labels, set them sparsely
-#                     if sail.telemetry['ship_speed'][it.index] > 300:
-#                         n_th_print = 1  # print all labels
-#                     if 150 < sail.telemetry['ship_speed'][it.index] < 300:
-#                         n_th_print = 3  # print every 5th label
-#                     if sail.telemetry['ship_speed'][it.index] < 150:
-#                         n_th_print = 5  # print every 5th label
-# 
-#                     if -19 < y_location < 19 and (it[0] / 60) % (circle_spacing_minutes * n_th_print) == 0:
-#                         
-#                         text_speed = r'{:10.0f} km/s'.format(speed)
-#                         ax.annotate(
-#                             text_speed,
-#                             xy=(x_location + 1, y_location - 0.5),
-#                             fontsize=12)
-# 
-#             it.iternext()
 
     # Format the figure
     #plt.rc('text', usetex=True)
@@ -946,7 +789,11 @@ def make_figure_multiple_sails(
         
         color = [1 - color_shade, 0, color_shade]
 
-
+        dashed = False
+        if(iter_counter==1):
+            color = [0,0,0]
+            dashed=True
+            
         my_figure = make_figure_flight(
             ship,
             star,
@@ -959,7 +806,8 @@ def make_figure_multiple_sails(
             circle_spacing_minutes,
             annotate_cases,
             caption='',
-            colorbar=False)
+            colorbar=False,
+            dashed=dashed)
 
     fig = plt.gcf()
     ax = fig.add_subplot(111, aspect='equal')
@@ -968,6 +816,56 @@ def make_figure_multiple_sails(
     ax.annotate('IV', xy=(6, -18))
     fig.suptitle('a', fontsize=16, fontweight='bold', weight='heavy', x=0.22, y=0.95)
 
+    return my_figure
+
+
+def make_figure_multiple_sails_zoffset(
+    sailarray,
+    star,
+    minimum_distance_from_star,
+    afterburner_distance,
+    timestep,
+    return_mission):
+    
+    '''Creates a figure with multiple flights, each with a different sail, showing the z evolution'''
+
+    color = 'black'
+    
+    niterations = len(sailarray)
+    iter_counter = 0
+    
+    
+    my_figure = plt.figure()
+    ax = my_figure.add_subplot(111)
+    ax.set_xlabel('Time [days]', fontweight='bold')
+    ax.set_ylabel('Z Offset [Stellar Radii]',fontweight='bold')
+    #plt.rc('text', usetex=True)
+    plt.rc('font', family='serif')
+    
+    for ship in sailarray:
+        iter_counter += 1
+        
+        print(
+            'Now running iteration', iter_counter,
+            'of', int(niterations))
+        
+        print ship
+        ship.fly(star,minimum_distance_from_star,afterburner_distance,timestep,return_mission)
+        print ship.telemetry['stellar_distance'][-1]
+        
+        color_shade = float(iter_counter) / float(niterations)
+        
+        if color_shade > 1:
+            color_shade = 1
+        if color_shade < 0:
+            color_shade = 0
+        
+        color = [1 - color_shade, 0, color_shade]
+
+        ax.plot(ship.telemetry['time']/(60.0*60.0*24.0), ship.telemetry['pz'], label=str(ship.charge/1e-6) +r' $\mu$ C', color=color)
+        
+
+   # ax.legend(loc='upper left')    
     return my_figure
 
 def make_figure_multiple_stars(
